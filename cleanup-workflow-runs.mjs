@@ -6,11 +6,12 @@
  * Reusable across repositories via --repo owner/name.
  *
  * Examples:
- *   node scripts/cleanup-workflow-runs.mjs --repo Nick2bad4u/eslint-plugin-typefest --status failure,cancelled --limit 200 --confirm
+ *   node cleanup-workflow-runs.mjs --repo Nick2bad4u/gh-runs-cleanup --status failure,cancelled --limit 200 --confirm
  *   node scripts/cleanup-workflow-runs.mjs --repo owner/repo --workflow "CI" --branch main --dry-run
  */
 
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 /**
  * @typedef {Object} WorkflowRun
@@ -93,8 +94,8 @@ function parseArguments(args) {
     return parsed;
 }
 
-function printHelpAndExit(code = 0) {
-    console.log(`cleanup-workflow-runs.mjs
+function printHelp() {
+    return `gh-runs-cleanup
 
 Delete GitHub Actions workflow runs using gh CLI.
 
@@ -120,12 +121,10 @@ Execution:
   --help                        Show this help
 
 Examples:
-  node scripts/cleanup-workflow-runs.mjs --repo owner/repo --confirm
-  node scripts/cleanup-workflow-runs.mjs --repo owner/repo --status failure,cancelled --limit 500 --confirm
-  node scripts/cleanup-workflow-runs.mjs --repo owner/repo --workflow "CI" --branch main --dry-run
-`);
-
-    process.exit(code);
+    gh runs-cleanup --repo owner/repo --confirm
+    gh runs-cleanup --repo owner/repo --status failure,cancelled --limit 500 --confirm
+    gh runs-cleanup --repo owner/repo --workflow "CI" --branch main --dry-run
+`;
 }
 
 /**
@@ -208,17 +207,23 @@ function deleteRun(repo, runId) {
     return response.status === 0;
 }
 
-function main() {
-    const options = parseArguments(process.argv.slice(2));
+/**
+ * @param {string[]} argv
+ * @returns {number}
+ */
+export function main(argv) {
+    const options = parseArguments(argv);
 
     if (options.help === true) {
-        printHelpAndExit(0);
+        console.log(printHelp());
+        return 0;
     }
 
     const repo = options.repo;
     if (typeof repo !== "string" || repo.length === 0) {
         console.error("Error: --repo <owner/name> is required.");
-        printHelpAndExit(1);
+        console.log(printHelp());
+        return 1;
     }
 
     const dryRun = options["dry-run"] === true;
@@ -238,20 +243,20 @@ function main() {
 
     if (statuses.length === 0) {
         console.error("Error: at least one --status value is required.");
-        process.exit(1);
+        return 1;
     }
 
     const invalidStatuses = statuses.filter((status) => !VALID_STATUSES.has(status));
     if (invalidStatuses.length > 0) {
         console.error(`Error: invalid statuses: ${invalidStatuses.join(", ")}`);
         console.error(`Valid values: ${Array.from(VALID_STATUSES).join(", ")}`);
-        process.exit(1);
+        return 1;
     }
 
     const limit = Number.parseInt(String(options.limit ?? "200"), 10);
     if (!Number.isFinite(limit) || limit < 1) {
         console.error("Error: --limit must be a positive integer.");
-        process.exit(1);
+        return 1;
     }
 
     const maxDeleteOption = options["max-delete"];
@@ -260,9 +265,12 @@ function main() {
             ? Number.parseInt(maxDeleteOption, 10)
             : undefined;
 
-    if (maxDeleteOption !== undefined && (!Number.isFinite(maxDelete) || maxDelete < 1)) {
+    if (
+        maxDeleteOption !== undefined &&
+        (typeof maxDelete !== "number" || !Number.isFinite(maxDelete) || maxDelete < 1)
+    ) {
         console.error("Error: --max-delete must be a positive integer.");
-        process.exit(1);
+        return 1;
     }
 
     options.limit = String(limit);
@@ -271,7 +279,7 @@ function main() {
     const authResult = runGh(["auth", "status"]);
     if (authResult.status !== 0) {
         console.error("Error: gh CLI is not authenticated. Run: gh auth login");
-        process.exit(1);
+        return 1;
     }
 
     /** @type {WorkflowRun[]} */
@@ -295,7 +303,7 @@ function main() {
 
     if (runsToProcess.length === 0) {
         console.log("Nothing to delete.");
-        return;
+        return 0;
     }
 
     if (verbose || dryRun) {
@@ -312,14 +320,14 @@ function main() {
 
     if (dryRun) {
         console.log("Dry run complete: no deletions performed.");
-        return;
+        return 0;
     }
 
     if (!confirm) {
         console.error(
             "Safety stop: pass --confirm to perform deletion, or use --dry-run to preview."
         );
-        process.exit(1);
+        return 1;
     }
 
     const candidates =
@@ -354,14 +362,23 @@ function main() {
 
     if (failedIds.length > 0) {
         console.log(`Failed IDs (first 50): ${failedIds.slice(0, 50).join(", ")}`);
-        process.exit(2);
+        return 2;
+    }
+
+    return 0;
+}
+
+export function runCli() {
+    try {
+        const code = main(process.argv.slice(2));
+        process.exit(code);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Error: ${message}`);
+        process.exit(1);
     }
 }
 
-try {
-    main();
-} catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`Error: ${message}`);
-    process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    runCli();
 }
