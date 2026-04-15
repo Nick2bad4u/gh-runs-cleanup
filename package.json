@@ -26,30 +26,32 @@
         "gh-runs-cleanup": "./gh-runs-cleanup"
     },
     "files": [
-        "dist",
         "cleanup-workflow-runs.mjs",
         "gh-runs-cleanup",
+        "src",
         "README.md",
         "LICENSE"
     ],
     "scripts": {
         "build": "tsc -p tsconfig.json",
-        "typecheck": "tsc -p tsconfig.json --noEmit",
-        "start": "node ./dist/src/cli.js",
         "dev": "node ./src/cli.ts",
         "format": "prettier . --write",
         "format:check": "prettier . --check",
-        "lint:prettier": "prettier . --log-level warn --cache --cache-location=.cache/.prettier-cache --cache-strategy=content --check",
-        "lint:prettier:fix": "prettier . --log-level warn --cache --cache-location=.cache/.prettier-cache --cache-strategy=content --write",
         "lint": "eslint --cache --cache-strategy content --cache-location .cache/.eslintcache",
-        "lint:fix": "eslint --cache --cache-strategy content --cache-location .cache/.eslintcache --fix",
-        "test": "npm run build && node --test dist/test/**/*.test.js",
         "lint:all": "npm run lint:prettier && npm run lint && npm run typecheck",
         "lint:all:fix": "npm run lint:prettier:fix && npm run lint:fix && npm run typecheck",
-        "update-deps": "npx ncu -i --install never && npm install --force"
+        "lint:fix": "eslint --cache --cache-strategy content --cache-location .cache/.eslintcache --fix",
+        "lint:prettier": "prettier . --log-level warn --cache --cache-location=.cache/.prettier-cache --cache-strategy=content --check",
+        "lint:prettier:fix": "prettier . --log-level warn --cache --cache-location=.cache/.prettier-cache --cache-strategy=content --write",
+        "release:check": "npm run lint:all && npm test",
+        "start": "node ./src/cli.ts",
+        "sync:node-version-files": "node scripts/sync-node-version-files.mjs",
+        "test": "npm run build && node --test dist/test/**/*.test.js",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "update-deps": "npx ncu -i --install never && npm run sync:node-version-files && npm install --force"
     },
     "engines": {
-        "node": ">=22.0.0"
+        "node": ">=22.18.0"
     },
     "devDependencies": {
         "@softonus/prettier-plugin-duplicate-remover": "^1.1.2",
