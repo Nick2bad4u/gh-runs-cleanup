@@ -1,5 +1,5 @@
 #!/usr/bin/env node
 
-import { runCli } from "./cleanup-workflow-runs.mjs";
+import { runCli } from "./dist/src/cli.js";
 
 runCli();

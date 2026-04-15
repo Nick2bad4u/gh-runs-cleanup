@@ -65,24 +65,3 @@ updates:
       multi-ecosystem-group: dependabot-all
       patterns:
           - "*"
-
-    - package-ecosystem: npm
-      cooldown:
-          default-days: 3
-          include: ["*"]
-      directory: /docs/docusaurus
-      rebase-strategy: auto
-      versioning-strategy: increase
-      allow:
-          # Allow both direct and indirect updates for all packages
-          - dependency-type: "all"
-      ignore:
-          # Keep the docs workspace green too.
-          - dependency-name: "form-data"
-          - dependency-name: "qs"
-          - dependency-name: "tough-cookie"
-      labels:
-          - "npm"
-      multi-ecosystem-group: dependabot-all
-      patterns:
-          - "*"
