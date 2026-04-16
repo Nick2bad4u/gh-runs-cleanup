@@ -386,7 +386,7 @@ function formatTable(
               rt: "+",
           };
 
-    const horizontal = widths.map((width) => style.h.repeat(width));
+    const horizontal = widths.map((width) => style.h.repeat(width + 2));
     const top = `${style.tl}${horizontal.join(style.tt)}${style.tr}`;
     const middle = `${style.lt}${horizontal.join(style.j)}${style.rt}`;
     const bottom = `${style.bl}${horizontal.join(style.bt)}${style.br}`;
@@ -465,8 +465,8 @@ function printDryRunWorkflowSummary(
 
     console.log(
         formatTable(
-            ["Workflow", "Planned deletions"],
-            counts.map(([workflow, count]) => [workflow, String(count)]),
+            [styler.strong("Workflow"), styler.strong("Planned deletions")],
+            counts.map(([workflow, count]) => [workflow, styler.count(count)]),
             useUnicode
         )
     );
@@ -490,7 +490,7 @@ function printSummaryDetails(
     console.log(styler.info("By status"));
     console.log(
         formatTable(
-            ["Status", "Count"],
+            [styler.strong("Status"), styler.strong("Count")],
             statusCounts.map(([status, count]) => [
                 styler.status(status),
                 styler.count(count),
@@ -503,7 +503,7 @@ function printSummaryDetails(
     console.log(styler.info("Top branches"));
     console.log(
         formatTable(
-            ["Branch", "Count"],
+            [styler.strong("Branch"), styler.strong("Count")],
             branchCounts.map(([branch, count]) => [
                 branch,
                 styler.count(count),
@@ -539,11 +539,11 @@ function printVerboseRuns(
     console.log(
         formatTable(
             [
-                "Run ID",
-                "Status",
-                "Workflow",
-                "Branch",
-                "Created",
+                styler.strong("Run ID"),
+                styler.strong("Status"),
+                styler.strong("Workflow"),
+                styler.strong("Branch"),
+                styler.strong("Created"),
             ],
             rows,
             useUnicode
@@ -789,23 +789,40 @@ function printTextSummary(
     styler: Styler,
     useUnicode: boolean
 ): void {
+    const styledStatuses = summary.statuses.map((status) =>
+        styler.status(status)
+    );
+
     console.log(styler.heading("Cleanup summary"));
     console.log(
         formatTable(
-            ["Metric", "Value"],
+            [styler.strong("Metric"), styler.strong("Value")],
             [
-                ["Repository", summary.repo],
-                ["Statuses", summary.statuses.join(", ")],
-                ["Matched runs", String(summary.matched)],
+                [styler.info("Repository"), styler.strong(summary.repo)],
                 [
-                    "Planned deletions",
+                    styler.info("Statuses"),
+                    styledStatuses.join(styler.muted(", ")),
+                ],
+                [
+                    styler.info("Matched runs"),
+                    styler.strong(styler.count(summary.matched)),
+                ],
+                [
+                    styler.info("Planned deletions"),
                     styler.strong(styler.count(summary.planned)),
                 ],
                 [
-                    "Skipped by exclusion filters",
-                    String(summary.skippedByExclusion),
+                    styler.warn("Skipped by exclusion filters"),
+                    summary.skippedByExclusion > 0
+                        ? styler.warn(String(summary.skippedByExclusion))
+                        : styler.muted(String(summary.skippedByExclusion)),
                 ],
-                ["Skipped by age filter", String(summary.skippedByAge)],
+                [
+                    styler.warn("Skipped by age filter"),
+                    summary.skippedByAge > 0
+                        ? styler.warn(String(summary.skippedByAge))
+                        : styler.muted(String(summary.skippedByAge)),
+                ],
             ],
             useUnicode
         )
@@ -816,17 +833,20 @@ function printTextSummary(
         console.log(styler.info("Deletion results"));
         console.log(
             formatTable(
-                ["Metric", "Value"],
+                [styler.strong("Metric"), styler.strong("Value")],
                 [
-                    ["Attempted deletions", String(summary.attempted)],
                     [
-                        "Deleted",
+                        styler.info("Attempted deletions"),
+                        styler.strong(String(summary.attempted)),
+                    ],
+                    [
+                        styler.ok("Deleted"),
                         summary.deleted > 0
                             ? styler.ok(String(summary.deleted))
                             : styler.muted(String(summary.deleted)),
                     ],
                     [
-                        "Failed",
+                        styler.error("Failed"),
                         summary.failed > 0
                             ? styler.error(String(summary.failed))
                             : styler.ok(String(summary.failed)),
