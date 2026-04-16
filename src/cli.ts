@@ -195,6 +195,7 @@ Execution:
         --no-unicode                  Alias for --unicode never
         --no-progress                 Disable progress bars in interactive terminals
         --ci                          CI-friendly output (disables interactive formatting)
+                                                                Note: with --workflow, fetch uses compatibility mode and progress may update less frequently.
     --all-statuses                Target all valid statuses
   --help                        Show this help
 
@@ -741,10 +742,16 @@ function sortRuns(
     });
 }
 
-function listRuns(
+type ListRunsProgressCallback = (
+    fetchedInStatus: number,
+    detail: string
+) => void;
+
+function listRunsViaGhRunList(
     repo: string,
     status: string,
-    options: ParsedOptions
+    options: ParsedOptions,
+    onProgress?: ListRunsProgressCallback
 ): WorkflowRun[] {
     const args = [
         "run",
@@ -787,9 +794,116 @@ function listRuns(
         return [];
     }
 
-    return parsed
+    const runs = parsed
         .filter((entry) => entry && typeof entry === "object")
         .map((entry) => entry as WorkflowRun);
+
+    onProgress?.(runs.length, "legacy-list");
+    return runs;
+}
+
+function listRuns(
+    repo: string,
+    status: string,
+    options: ParsedOptions,
+    onProgress?: ListRunsProgressCallback
+): WorkflowRun[] {
+    const workflowValue = options["workflow"];
+    if (typeof workflowValue === "string" && workflowValue.length > 0) {
+        return listRunsViaGhRunList(repo, status, options, onProgress);
+    }
+
+    const limit = Number.parseInt(String(options["limit"] ?? "500"), 10);
+    const pageSize = 100;
+    const allRuns: WorkflowRun[] = [];
+
+    const queryMappings: Array<[keyof ParsedOptions, string]> = [
+        ["branch", "branch"],
+        ["event", "event"],
+        ["user", "actor"],
+        ["commit", "head_sha"],
+        ["created", "created"],
+    ];
+
+    for (let page = 1; allRuns.length < limit; page += 1) {
+        const remaining = limit - allRuns.length;
+        const perPage = Math.min(pageSize, remaining);
+        const args = [
+            "api",
+            "-X",
+            "GET",
+            `/repos/${repo}/actions/runs`,
+            "-f",
+            `status=${status}`,
+            "-f",
+            `per_page=${perPage}`,
+            "-f",
+            `page=${page}`,
+        ];
+
+        for (const [key, queryKey] of queryMappings) {
+            const value = options[key];
+            if (typeof value === "string" && value.length > 0) {
+                args.push("-f", `${queryKey}=${value}`);
+            }
+        }
+
+        const response = runGh(args);
+        if (response.status !== 0) {
+            throw new Error(
+                response.stderr || `gh api run list failed for status ${status}`
+            );
+        }
+
+        const parsed: unknown = JSON.parse(response.stdout || "{}");
+        const workflowRuns =
+            parsed &&
+            typeof parsed === "object" &&
+            Array.isArray(
+                (parsed as { workflow_runs?: unknown[] }).workflow_runs
+            )
+                ? (parsed as { workflow_runs: unknown[] }).workflow_runs
+                : [];
+
+        const mappedRuns = workflowRuns
+            .filter((entry) => entry && typeof entry === "object")
+            .map((entry) => {
+                const run = entry as {
+                    id?: number;
+                    status?: string;
+                    conclusion?: string;
+                    name?: string;
+                    workflow_name?: string;
+                    head_branch?: string;
+                    event?: string;
+                    created_at?: string;
+                    display_title?: string;
+                    html_url?: string;
+                };
+
+                return {
+                    createdAt: run.created_at,
+                    conclusion: run.conclusion,
+                    databaseId: run.id ?? 0,
+                    displayTitle: run.display_title,
+                    event: run.event,
+                    headBranch: run.head_branch,
+                    status: run.status,
+                    url: run.html_url,
+                    workflowName: run.workflow_name ?? run.name,
+                } as WorkflowRun;
+            })
+            .filter((run) => run.databaseId > 0);
+
+        allRuns.push(...mappedRuns);
+        onProgress?.(allRuns.length, `p=${page}`);
+
+        if (mappedRuns.length < perPage) {
+            break;
+        }
+    }
+
+    return allRuns.slice(0, limit);
 }
 
 function waitMs(milliseconds: number): void {
@@ -1366,20 +1480,32 @@ export function main(argv: string[]): number {
 
         const repoStartedAt = Date.now();
         const allRuns: WorkflowRun[] = [];
+        const expectedFetchTotal = Math.max(1, statuses.length * limit);
         const fetchProgress = createProgressBar(
             "Fetching runs",
-            statuses.length,
+            expectedFetchTotal,
             styler,
             showProgress
         );
 
         try {
             for (const [index, status] of statuses.entries()) {
-                const runs = listRuns(resolvedRepo, status, options);
+                const beforeCount = allRuns.length;
+                const runs = listRuns(
+                    resolvedRepo,
+                    status,
+                    options,
+                    (fetchedInStatus, detail) => {
+                        fetchProgress.update(
+                            beforeCount + fetchedInStatus,
+                            `s=${index + 1}/${statuses.length} ${status} ${detail} runs=${beforeCount + fetchedInStatus}`
+                        );
+                    }
+                );
                 allRuns.push(...runs);
                 fetchProgress.update(
-                    index + 1,
-                    `status=${status} totalRuns=${allRuns.length}`
+                    allRuns.length,
+                    `s=${index + 1}/${statuses.length} ${status} done runs=${allRuns.length}`
                 );
             }
             fetchProgress.done();
