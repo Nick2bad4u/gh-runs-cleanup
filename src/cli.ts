@@ -813,12 +813,15 @@ function deleteRunWithRetry(
     repo: string,
     runId: number,
     maxRetries: number,
-    baseDelayMs: number
+    baseDelayMs: number,
+    onAttempt?: (attempt: number, totalAttempts: number) => void
 ): DeleteResult {
     const endpoint = `/repos/${repo}/actions/runs/${runId}`;
     let lastError = "";
+    const totalAttempts = maxRetries + 1;
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        onAttempt?.(attempt + 1, totalAttempts);
         const response = runGh([
             "api",
             "-X",
@@ -1304,14 +1307,34 @@ export function main(argv: string[]): number {
         showProgress && !dryRun
     );
 
+    if (!jsonOutput && !quiet) {
+        console.log(
+            styler.info(
+                `Planned deletions: ${candidates.length} (from ${allRuns.length} fetched runs, ${dedupedRuns.length} unique).`
+            )
+        );
+    }
+
     if (!dryRun) {
         for (const run of candidates) {
             attempted += 1;
+
+            deleteProgress.update(
+                attempted - 1,
+                `run=${run.databaseId} attempt=1/${maxRetries + 1} deleted=${deleted} failed=${failedIds.length}`
+            );
+
             const result = deleteRunWithRetry(
                 resolvedRepo,
                 run.databaseId,
                 maxRetries,
-                retryDelayMs
+                retryDelayMs,
+                (attemptNumber, totalAttempts) => {
+                    deleteProgress.update(
+                        attempted - 1,
+                        `run=${run.databaseId} attempt=${attemptNumber}/${totalAttempts} deleted=${deleted} failed=${failedIds.length}`
+                    );
+                }
             );
             if (result.ok) {
                 deleted += 1;
