@@ -111,7 +111,8 @@ function parseArguments(args: string[]): ParsedOptions {
             key === "no-color" ||
             key === "no-unicode" ||
             key === "no-progress" ||
-            key === "ci"
+            key === "ci" ||
+            key === "all-repos"
         ) {
             parsed[key] = true;
             continue;
@@ -133,7 +134,8 @@ function parseArguments(args: string[]): ParsedOptions {
         if (
             key === "status" ||
             key === "exclude-workflow" ||
-            key === "exclude-branch"
+            key === "exclude-branch" ||
+            key === "repos"
         ) {
             const existing = parsed[key];
             const bucket = Array.isArray(existing) ? existing : [];
@@ -155,6 +157,9 @@ Delete GitHub Actions workflow runs using gh CLI.
 
 Target repository:
     --repo <owner/name>           Target repository (optional if run inside a repo)
+    --repos <owner/name[,..]>     Multiple target repositories (repeatable)
+    --all-repos                   Target all repositories for an owner/login
+    --owner <login>               Owner/login used with --all-repos (default: authenticated user)
 
 Filters:
   --status <value[,value...]>   Run statuses to target (repeatable)
@@ -195,6 +200,8 @@ Execution:
 
 Examples:
     gh runs-cleanup --repo owner/repo --confirm
+    gh runs-cleanup --repos owner/repo,owner/other-repo --dry-run
+    gh runs-cleanup --all-repos --owner my-user --status failure --confirm
     gh runs-cleanup --repo owner/repo --status failure,cancelled --limit 500 --confirm
     gh runs-cleanup --repo owner/repo --workflow "CI" --branch main --dry-run
     gh runs-cleanup --repo owner/repo --json --dry-run
@@ -621,6 +628,53 @@ function resolveRepo(optionRepo: string | undefined): string | undefined {
 
     const resolved = response.stdout.trim();
     return resolved.length > 0 ? resolved : undefined;
+}
+
+function resolveAuthenticatedLogin(): string | undefined {
+    const response = runGh([
+        "api",
+        "user",
+        "--jq",
+        ".login",
+    ]);
+
+    if (response.status !== 0) {
+        return undefined;
+    }
+
+    const login = response.stdout.trim();
+    return login.length > 0 ? login : undefined;
+}
+
+function listReposForOwner(owner: string): string[] {
+    const response = runGh([
+        "repo",
+        "list",
+        owner,
+        "--limit",
+        "1000",
+        "--json",
+        "nameWithOwner",
+    ]);
+
+    if (response.status !== 0) {
+        throw new Error(
+            response.stderr || `failed to list repositories for ${owner}`
+        );
+    }
+
+    const parsed: unknown = JSON.parse(response.stdout || "[]");
+    if (!Array.isArray(parsed)) {
+        return [];
+    }
+
+    return parsed
+        .filter((entry) => entry && typeof entry === "object")
+        .map((entry) => (entry as { nameWithOwner?: string }).nameWithOwner)
+        .filter(
+            (name): name is string =>
+                typeof name === "string" && name.length > 0
+        );
 }
 
 function isValidRepoSlug(value: string): boolean {
@@ -1169,29 +1223,25 @@ export function main(argv: string[]): number {
         typeof options["repo"] === "string"
             ? options["repo"].trim()
             : undefined;
-    if (typeof repoOption === "string" && !isValidRepoSlug(repoOption)) {
+    const reposOption = collectStringListOption(options, "repos");
+    const allReposMode = options["all-repos"] === true;
+    const ownerOption =
+        typeof options["owner"] === "string" &&
+        options["owner"].trim().length > 0
+            ? options["owner"].trim()
+            : undefined;
+
+    if (
+        allReposMode &&
+        (typeof repoOption === "string" || reposOption.length > 0)
+    ) {
         return emitError(
-            "--repo must be in owner/name format.",
+            "--all-repos cannot be combined with --repo or --repos.",
             "validation_error",
             jsonOutput,
             styler
         );
     }
-
-    const resolvedRepo = resolveRepo(repoOption);
-    if (typeof resolvedRepo !== "string" || resolvedRepo.length === 0) {
-        if (!jsonOutput) {
-            console.log(printHelp());
-        }
-        return emitError(
-            "unable to resolve repository. Provide --repo <owner/name> or run inside a GitHub repository.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    options["limit"] = String(limit);
 
     const authResult = runGh(["auth", "status"]);
     if (authResult.status !== 0) {
@@ -1203,7 +1253,80 @@ export function main(argv: string[]): number {
         );
     }
 
-    const allRuns: WorkflowRun[] = [];
+    let targetRepos: string[] = [];
+
+    if (allReposMode) {
+        const owner = ownerOption ?? resolveAuthenticatedLogin();
+        if (typeof owner !== "string" || owner.length === 0) {
+            return emitError(
+                "unable to resolve authenticated user for --all-repos. Pass --owner <login>.",
+                "validation_error",
+                jsonOutput,
+                styler
+            );
+        }
+
+        try {
+            targetRepos = listReposForOwner(owner);
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : String(error);
+            return emitError(
+                `failed to list repositories: ${message}`,
+                "gh_cli_error",
+                jsonOutput,
+                styler
+            );
+        }
+
+        if (targetRepos.length === 0) {
+            return emitError(
+                `no repositories found for ${owner}.`,
+                "validation_error",
+                jsonOutput,
+                styler
+            );
+        }
+    } else {
+        if (typeof repoOption === "string" && repoOption.length > 0) {
+            targetRepos.push(repoOption);
+        }
+
+        targetRepos.push(...reposOption);
+
+        if (targetRepos.length === 0) {
+            const resolvedRepo = resolveRepo(undefined);
+            if (typeof resolvedRepo !== "string" || resolvedRepo.length === 0) {
+                if (!jsonOutput) {
+                    console.log(printHelp());
+                }
+                return emitError(
+                    "unable to resolve repository. Provide --repo <owner/name> / --repos <owner/name,..> or run inside a GitHub repository.",
+                    "validation_error",
+                    jsonOutput,
+                    styler
+                );
+            }
+
+            targetRepos = [resolvedRepo];
+        }
+    }
+
+    targetRepos = Array.from(new Set(targetRepos));
+
+    const invalidRepoValues = targetRepos.filter(
+        (repo) => !isValidRepoSlug(repo)
+    );
+    if (invalidRepoValues.length > 0) {
+        return emitError(
+            `invalid repository values: ${invalidRepoValues.join(", ")}. Use owner/name format.`,
+            "validation_error",
+            jsonOutput,
+            styler
+        );
+    }
+
+    options["limit"] = String(limit);
     const showProgress = shouldShowProgress(
         jsonOutput,
         quiet,
@@ -1211,200 +1334,268 @@ export function main(argv: string[]): number {
         noProgress,
         ciMode
     );
-    const fetchProgress = createProgressBar(
-        "Fetching runs",
-        statuses.length,
-        styler,
-        showProgress
-    );
+    const repoSummaries: RunSummary[] = [];
 
-    try {
-        for (const [index, status] of statuses.entries()) {
-            const runs = listRuns(resolvedRepo, status, options);
-            allRuns.push(...runs);
-            fetchProgress.update(
-                index + 1,
-                `status=${status} totalRuns=${allRuns.length}`
+    for (const [repoIndex, resolvedRepo] of targetRepos.entries()) {
+        if (!jsonOutput && !quiet && targetRepos.length > 1) {
+            if (repoIndex > 0) {
+                console.log("");
+            }
+            console.log(
+                styler.heading(
+                    `Repository ${repoIndex + 1}/${targetRepos.length}: ${resolvedRepo}`
+                )
             );
         }
-        fetchProgress.done();
-    } catch (error) {
-        fetchProgress.done();
-        const message = error instanceof Error ? error.message : String(error);
-        return emitError(
-            `failed to list runs: ${message}`,
-            "gh_cli_error",
-            jsonOutput,
-            styler
+
+        const repoStartedAt = Date.now();
+        const allRuns: WorkflowRun[] = [];
+        const fetchProgress = createProgressBar(
+            `Fetching runs (${resolvedRepo})`,
+            statuses.length,
+            styler,
+            showProgress
         );
-    }
 
-    const uniqueById = new Map<number, WorkflowRun>();
-    for (const run of allRuns) {
-        uniqueById.set(run.databaseId, run);
-    }
-
-    const dedupedRuns = Array.from(uniqueById.values());
-    const orderedRuns = sortRuns(dedupedRuns, order);
-
-    let skippedByExclusion = 0;
-    const includedRuns = orderedRuns.filter((run) => {
-        const workflowName = run.workflowName?.toLowerCase();
-        const branchName = run.headBranch?.toLowerCase();
-
-        const excludedByWorkflow =
-            typeof workflowName === "string" &&
-            excludedWorkflowNames.has(workflowName);
-        const excludedByBranch =
-            typeof branchName === "string" &&
-            excludedBranchNames.has(branchName);
-
-        if (excludedByWorkflow || excludedByBranch) {
-            skippedByExclusion += 1;
-            return false;
+        try {
+            for (const [index, status] of statuses.entries()) {
+                const runs = listRuns(resolvedRepo, status, options);
+                allRuns.push(...runs);
+                fetchProgress.update(
+                    index + 1,
+                    `status=${status} totalRuns=${allRuns.length}`
+                );
+            }
+            fetchProgress.done();
+        } catch (error) {
+            fetchProgress.done();
+            const message =
+                error instanceof Error ? error.message : String(error);
+            return emitError(
+                `failed to list runs for ${resolvedRepo}: ${message}`,
+                "gh_cli_error",
+                jsonOutput,
+                styler
+            );
         }
 
-        return true;
-    });
+        const uniqueById = new Map<number, WorkflowRun>();
+        for (const run of allRuns) {
+            uniqueById.set(run.databaseId, run);
+        }
 
-    let skippedByAge = 0;
-    const now = Date.now();
-    const ageCutoffEpoch =
-        typeof beforeDays === "number"
-            ? now - beforeDays * 24 * 60 * 60 * 1000
-            : undefined;
-    const runsToProcess =
-        typeof ageCutoffEpoch === "number"
-            ? includedRuns.filter((run) => {
-                  const createdEpoch = getCreatedAtEpoch(run);
-                  const include = Number.isFinite(createdEpoch)
-                      ? createdEpoch <= ageCutoffEpoch
-                      : true;
-                  if (!include) {
-                      skippedByAge += 1;
-                  }
-                  return include;
-              })
-            : includedRuns;
+        const dedupedRuns = Array.from(uniqueById.values());
+        const orderedRuns = sortRuns(dedupedRuns, order);
 
-    const candidates =
-        Number.isFinite(maxDelete) && maxDelete !== undefined
-            ? runsToProcess.slice(0, maxDelete)
-            : runsToProcess;
+        let skippedByExclusion = 0;
+        const includedRuns = orderedRuns.filter((run) => {
+            const workflowName = run.workflowName?.toLowerCase();
+            const branchName = run.headBranch?.toLowerCase();
 
-    if (verbose && !jsonOutput && !quiet) {
-        printVerboseRuns(candidates, styler, unicodeTables);
-    }
+            const excludedByWorkflow =
+                typeof workflowName === "string" &&
+                excludedWorkflowNames.has(workflowName);
+            const excludedByBranch =
+                typeof branchName === "string" &&
+                excludedBranchNames.has(branchName);
 
-    let deleted = 0;
-    const failedIds: number[] = [];
-    let attempted = 0;
-
-    const deleteProgress = createProgressBar(
-        "Deleting runs",
-        candidates.length,
-        styler,
-        showProgress && !dryRun
-    );
-
-    if (!jsonOutput && !quiet) {
-        console.log(
-            styler.info(
-                `Planned deletions: ${candidates.length} (from ${allRuns.length} fetched runs, ${dedupedRuns.length} unique).`
-            )
-        );
-    }
-
-    if (!dryRun) {
-        for (const run of candidates) {
-            attempted += 1;
-
-            deleteProgress.update(
-                attempted - 1,
-                `run=${run.databaseId} attempt=1/${maxRetries + 1} deleted=${deleted} failed=${failedIds.length}`
-            );
-
-            const result = deleteRunWithRetry(
-                resolvedRepo,
-                run.databaseId,
-                maxRetries,
-                retryDelayMs,
-                (attemptNumber, totalAttempts) => {
-                    deleteProgress.update(
-                        attempted - 1,
-                        `run=${run.databaseId} attempt=${attemptNumber}/${totalAttempts} deleted=${deleted} failed=${failedIds.length}`
-                    );
-                }
-            );
-            if (result.ok) {
-                deleted += 1;
-            } else {
-                failedIds.push(run.databaseId);
-                if (verbose && !jsonOutput) {
-                    console.error(
-                        `Delete failed for run ${run.databaseId} after ${result.attempts} attempt(s): ${result.error ?? "unknown"}`
-                    );
-                }
-
-                if (failFast) {
-                    break;
-                }
-
-                if (
-                    typeof maxFailures === "number" &&
-                    failedIds.length >= maxFailures
-                ) {
-                    break;
-                }
+            if (excludedByWorkflow || excludedByBranch) {
+                skippedByExclusion += 1;
+                return false;
             }
 
-            deleteProgress.update(
-                attempted,
-                `deleted=${deleted} failed=${failedIds.length}`
+            return true;
+        });
+
+        let skippedByAge = 0;
+        const now = Date.now();
+        const ageCutoffEpoch =
+            typeof beforeDays === "number"
+                ? now - beforeDays * 24 * 60 * 60 * 1000
+                : undefined;
+        const runsToProcess =
+            typeof ageCutoffEpoch === "number"
+                ? includedRuns.filter((run) => {
+                      const createdEpoch = getCreatedAtEpoch(run);
+                      const include = Number.isFinite(createdEpoch)
+                          ? createdEpoch <= ageCutoffEpoch
+                          : true;
+                      if (!include) {
+                          skippedByAge += 1;
+                      }
+                      return include;
+                  })
+                : includedRuns;
+
+        const candidates =
+            Number.isFinite(maxDelete) && maxDelete !== undefined
+                ? runsToProcess.slice(0, maxDelete)
+                : runsToProcess;
+
+        if (verbose && !jsonOutput && !quiet) {
+            printVerboseRuns(candidates, styler, unicodeTables);
+        }
+
+        let deleted = 0;
+        const failedIds: number[] = [];
+        let attempted = 0;
+
+        const deleteProgress = createProgressBar(
+            `Deleting runs (${resolvedRepo})`,
+            candidates.length,
+            styler,
+            showProgress && !dryRun
+        );
+
+        if (!jsonOutput && !quiet) {
+            console.log(
+                styler.info(
+                    `Planned deletions: ${candidates.length} (from ${allRuns.length} fetched runs, ${dedupedRuns.length} unique).`
+                )
             );
         }
 
-        deleteProgress.done();
-    }
+        if (!dryRun) {
+            for (const run of candidates) {
+                attempted += 1;
 
-    const summary: RunSummary = {
-        attempted,
-        deleted,
-        dryRun,
-        durationMs: Date.now() - startedAt,
-        failed: failedIds.length,
-        failedIds,
-        matched: runsToProcess.length,
-        planned: candidates.length,
-        repo: resolvedRepo,
-        skippedByExclusion,
-        statuses,
-        skippedByAge,
-    };
+                deleteProgress.update(
+                    attempted - 1,
+                    `run=${run.databaseId} attempt=1/${maxRetries + 1} deleted=${deleted} failed=${failedIds.length}`
+                );
 
-    if (jsonOutput) {
-        console.log(JSON.stringify(summary, null, 2));
-    } else {
-        if (!quiet) {
-            printTextSummary(summary, styler, unicodeTables);
-            if (dryRun) {
-                printDryRunWorkflowSummary(candidates, styler, unicodeTables);
+                const result = deleteRunWithRetry(
+                    resolvedRepo,
+                    run.databaseId,
+                    maxRetries,
+                    retryDelayMs,
+                    (attemptNumber, totalAttempts) => {
+                        deleteProgress.update(
+                            attempted - 1,
+                            `run=${run.databaseId} attempt=${attemptNumber}/${totalAttempts} deleted=${deleted} failed=${failedIds.length}`
+                        );
+                    }
+                );
+                if (result.ok) {
+                    deleted += 1;
+                } else {
+                    failedIds.push(run.databaseId);
+                    if (verbose && !jsonOutput) {
+                        console.error(
+                            `Delete failed for run ${run.databaseId} after ${result.attempts} attempt(s): ${result.error ?? "unknown"}`
+                        );
+                    }
+
+                    if (failFast) {
+                        break;
+                    }
+
+                    if (
+                        typeof maxFailures === "number" &&
+                        failedIds.length >= maxFailures
+                    ) {
+                        break;
+                    }
+                }
+
+                deleteProgress.update(
+                    attempted,
+                    `deleted=${deleted} failed=${failedIds.length}`
+                );
             }
-            if (summaryMode) {
-                printSummaryDetails(
-                    runsToProcess,
-                    candidates,
-                    styler,
-                    unicodeTables
+
+            deleteProgress.done();
+        }
+
+        const summary: RunSummary = {
+            attempted,
+            deleted,
+            dryRun,
+            durationMs: Date.now() - repoStartedAt,
+            failed: failedIds.length,
+            failedIds,
+            matched: runsToProcess.length,
+            planned: candidates.length,
+            repo: resolvedRepo,
+            skippedByExclusion,
+            statuses,
+            skippedByAge,
+        };
+
+        repoSummaries.push(summary);
+
+        if (!jsonOutput) {
+            if (!quiet) {
+                printTextSummary(summary, styler, unicodeTables);
+                if (dryRun) {
+                    printDryRunWorkflowSummary(
+                        candidates,
+                        styler,
+                        unicodeTables
+                    );
+                }
+                if (summaryMode) {
+                    printSummaryDetails(
+                        runsToProcess,
+                        candidates,
+                        styler,
+                        unicodeTables
+                    );
+                }
+            }
+            if (dryRun && !quiet) {
+                console.log(
+                    styler.ok("Dry run complete: no deletions performed.")
                 );
             }
         }
-        if (dryRun && !quiet) {
-            console.log(styler.ok("Dry run complete: no deletions performed."));
+    }
+
+    if (jsonOutput) {
+        if (repoSummaries.length === 1) {
+            console.log(JSON.stringify(repoSummaries[0], null, 2));
+        } else {
+            const aggregate = {
+                attempted: repoSummaries.reduce(
+                    (accumulator, summary) => accumulator + summary.attempted,
+                    0
+                ),
+                deleted: repoSummaries.reduce(
+                    (accumulator, summary) => accumulator + summary.deleted,
+                    0
+                ),
+                dryRun,
+                durationMs: Date.now() - startedAt,
+                failed: repoSummaries.reduce(
+                    (accumulator, summary) => accumulator + summary.failed,
+                    0
+                ),
+                matched: repoSummaries.reduce(
+                    (accumulator, summary) => accumulator + summary.matched,
+                    0
+                ),
+                planned: repoSummaries.reduce(
+                    (accumulator, summary) => accumulator + summary.planned,
+                    0
+                ),
+                repoCount: repoSummaries.length,
+            };
+
+            console.log(
+                JSON.stringify(
+                    {
+                        aggregate,
+                        repos: repoSummaries,
+                    },
+                    null,
+                    2
+                )
+            );
         }
     }
 
-    return failedIds.length > 0 ? 2 : 0;
+    const hasFailures = repoSummaries.some((summary) => summary.failed > 0);
+    return hasFailures ? 2 : 0;
 }
 
 export function runCli(): void {

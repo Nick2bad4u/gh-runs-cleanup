@@ -140,3 +140,15 @@ test("main returns 1 for invalid unicode mode", () => {
     );
     assert.equal(code, 1);
 });
+
+test("main returns 1 when --all-repos is combined with --repo", () => {
+    const code = withSilentConsole(() =>
+        main([
+            "--all-repos",
+            "--repo",
+            "owner/repo",
+            "--dry-run",
+        ])
+    );
+    assert.equal(code, 1);
+});
