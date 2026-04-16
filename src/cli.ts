@@ -109,7 +109,9 @@ function parseArguments(args: string[]): ParsedOptions {
             key === "json" ||
             key === "summary" ||
             key === "no-color" ||
-            key === "no-unicode"
+            key === "no-unicode" ||
+            key === "no-progress" ||
+            key === "ci"
         ) {
             parsed[key] = true;
             continue;
@@ -186,6 +188,8 @@ Execution:
     --no-color                    Alias for --color never
         --unicode <auto|always|never> Unicode table borders/symbols (default: auto)
         --no-unicode                  Alias for --unicode never
+        --no-progress                 Disable progress bars in interactive terminals
+        --ci                          CI-friendly output (disables interactive formatting)
     --all-statuses                Target all valid statuses
   --help                        Show this help
 
@@ -738,6 +742,67 @@ function waitMs(milliseconds: number): void {
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
 
+function shouldShowProgress(
+    asJson: boolean,
+    quiet: boolean,
+    verbose: boolean,
+    noProgress: boolean,
+    ciMode: boolean
+): boolean {
+    return (
+        !asJson &&
+        !quiet &&
+        !verbose &&
+        !noProgress &&
+        !ciMode &&
+        process.stdout.isTTY
+    );
+}
+
+type ProgressState = {
+    done: () => void;
+    update: (completed: number, suffix?: string) => void;
+};
+
+function createProgressBar(
+    title: string,
+    total: number,
+    styler: Styler,
+    enabled: boolean
+): ProgressState {
+    if (!enabled || total <= 0) {
+        return {
+            done: () => {},
+            update: () => {},
+        };
+    }
+
+    const width = 24;
+    const totalSafe = Math.max(1, total);
+
+    const render = (completed: number, suffix = ""): void => {
+        const clamped = Math.min(Math.max(completed, 0), totalSafe);
+        const percent = Math.floor((clamped / totalSafe) * 100);
+        const filled = Math.round((clamped / totalSafe) * width);
+        const bar = `${"█".repeat(filled)}${"░".repeat(width - filled)}`;
+        const progressText = `${clamped}/${totalSafe}`;
+        const line = `${styler.info(title)} ${styler.muted("[")}${styler.ok(bar)}${styler.muted("]")} ${styler.strong(progressText)} ${styler.muted(`${percent}%`)}${suffix.length > 0 ? ` ${styler.muted(suffix)}` : ""}`;
+        process.stdout.write(`\r${line}`);
+    };
+
+    render(0);
+
+    return {
+        update: (completed, suffix = "") => {
+            render(completed, suffix);
+        },
+        done: () => {
+            render(totalSafe);
+            process.stdout.write("\n");
+        },
+    };
+}
+
 function isRetryableDeleteError(stderr: string): boolean {
     const retryPattern =
         /timed out|timeout|rate limit|temporar|unavailable|internal server error|502|503|504|connection reset/iu;
@@ -868,9 +933,11 @@ export function main(argv: string[]): number {
     const startedAt = Date.now();
     const options = parseArguments(argv);
     const jsonOutput = options["json"] === true;
+    const ciMode = options["ci"] === true;
+    const noProgress = options["no-progress"] === true;
 
     const colorOption =
-        options["no-color"] === true
+        ciMode || options["no-color"] === true
             ? "never"
             : typeof options["color"] === "string" &&
                 options["color"].length > 0
@@ -907,7 +974,7 @@ export function main(argv: string[]): number {
     const failFast = options["fail-fast"] === true;
 
     const unicodeOption =
-        options["no-unicode"] === true
+        ciMode || options["no-unicode"] === true
             ? "never"
             : typeof options["unicode"] === "string" &&
                 options["unicode"].length > 0
@@ -1134,12 +1201,32 @@ export function main(argv: string[]): number {
     }
 
     const allRuns: WorkflowRun[] = [];
+    const showProgress = shouldShowProgress(
+        jsonOutput,
+        quiet,
+        verbose,
+        noProgress,
+        ciMode
+    );
+    const fetchProgress = createProgressBar(
+        "Fetching runs",
+        statuses.length,
+        styler,
+        showProgress
+    );
+
     try {
-        for (const status of statuses) {
+        for (const [index, status] of statuses.entries()) {
             const runs = listRuns(resolvedRepo, status, options);
             allRuns.push(...runs);
+            fetchProgress.update(
+                index + 1,
+                `status=${status} totalRuns=${allRuns.length}`
+            );
         }
+        fetchProgress.done();
     } catch (error) {
+        fetchProgress.done();
         const message = error instanceof Error ? error.message : String(error);
         return emitError(
             `failed to list runs: ${message}`,
@@ -1210,6 +1297,13 @@ export function main(argv: string[]): number {
     const failedIds: number[] = [];
     let attempted = 0;
 
+    const deleteProgress = createProgressBar(
+        "Deleting runs",
+        candidates.length,
+        styler,
+        showProgress && !dryRun
+    );
+
     if (!dryRun) {
         for (const run of candidates) {
             attempted += 1;
@@ -1240,7 +1334,14 @@ export function main(argv: string[]): number {
                     break;
                 }
             }
+
+            deleteProgress.update(
+                attempted,
+                `deleted=${deleted} failed=${failedIds.length}`
+            );
         }
+
+        deleteProgress.done();
     }
 
     const summary: RunSummary = {
