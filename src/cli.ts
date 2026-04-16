@@ -840,8 +840,24 @@ function createProgressBar(
         const filled = Math.round((clamped / totalSafe) * width);
         const bar = `${"█".repeat(filled)}${"░".repeat(width - filled)}`;
         const progressText = `${clamped}/${totalSafe}`;
-        const line = `${styler.info(title)} ${styler.muted("[")}${styler.ok(bar)}${styler.muted("]")} ${styler.strong(progressText)} ${styler.muted(`${percent}%`)}${suffix.length > 0 ? ` ${styler.muted(suffix)}` : ""}`;
-        process.stdout.write(`\r${line}`);
+        const plainPrefix = `${title} [${bar}] ${progressText} ${percent}%`;
+        const terminalWidth = process.stdout.columns;
+        const suffixBudget =
+            typeof terminalWidth === "number" && terminalWidth > 0
+                ? Math.max(0, terminalWidth - plainPrefix.length - 1)
+                : undefined;
+
+        const suffixText =
+            typeof suffixBudget === "number"
+                ? suffixBudget <= 0
+                    ? ""
+                    : suffix.length <= suffixBudget
+                      ? suffix
+                      : `${suffix.slice(0, Math.max(0, suffixBudget - 1))}…`
+                : suffix;
+
+        const line = `${styler.info(title)} ${styler.muted("[")}${styler.ok(bar)}${styler.muted("]")} ${styler.strong(progressText)} ${styler.muted(`${percent}%`)}${suffixText.length > 0 ? ` ${styler.muted(suffixText)}` : ""}`;
+        process.stdout.write(`\r\u001b[2K${line}`);
     };
 
     render(0);
@@ -1351,7 +1367,7 @@ export function main(argv: string[]): number {
         const repoStartedAt = Date.now();
         const allRuns: WorkflowRun[] = [];
         const fetchProgress = createProgressBar(
-            `Fetching runs (${resolvedRepo})`,
+            "Fetching runs",
             statuses.length,
             styler,
             showProgress
@@ -1440,13 +1456,6 @@ export function main(argv: string[]): number {
         const failedIds: number[] = [];
         let attempted = 0;
 
-        const deleteProgress = createProgressBar(
-            `Deleting runs (${resolvedRepo})`,
-            candidates.length,
-            styler,
-            showProgress && !dryRun
-        );
-
         if (!jsonOutput && !quiet) {
             console.log(
                 styler.info(
@@ -1455,14 +1464,16 @@ export function main(argv: string[]): number {
             );
         }
 
+        const deleteProgress = createProgressBar(
+            "Deleting runs",
+            candidates.length,
+            styler,
+            showProgress && !dryRun
+        );
+
         if (!dryRun) {
             for (const run of candidates) {
                 attempted += 1;
-
-                deleteProgress.update(
-                    attempted - 1,
-                    `run=${run.databaseId} attempt=1/${maxRetries + 1} deleted=${deleted} failed=${failedIds.length}`
-                );
 
                 const result = deleteRunWithRetry(
                     resolvedRepo,
@@ -1472,7 +1483,7 @@ export function main(argv: string[]): number {
                     (attemptNumber, totalAttempts) => {
                         deleteProgress.update(
                             attempted - 1,
-                            `run=${run.databaseId} attempt=${attemptNumber}/${totalAttempts} deleted=${deleted} failed=${failedIds.length}`
+                            `id=${run.databaseId} a=${attemptNumber}/${totalAttempts} d=${deleted} f=${failedIds.length}`
                         );
                     }
                 );
@@ -1500,7 +1511,7 @@ export function main(argv: string[]): number {
 
                 deleteProgress.update(
                     attempted,
-                    `deleted=${deleted} failed=${failedIds.length}`
+                    `d=${deleted} f=${failedIds.length}`
                 );
             }
 
