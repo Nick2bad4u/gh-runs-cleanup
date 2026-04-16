@@ -198,6 +198,54 @@ Examples:
 `;
 }
 
+function renderHelpText(styler: Styler): string {
+    const helpText = printHelp();
+    const sectionLines = new Set([
+        "Target repository:",
+        "Filters:",
+        "Execution:",
+        "Examples:",
+    ]);
+
+    return helpText
+        .split("\n")
+        .map((line, index) => {
+            if (line.length === 0) {
+                return line;
+            }
+
+            if (index === 0) {
+                return styler.heading(line);
+            }
+
+            if (sectionLines.has(line.trim())) {
+                return styler.info(line);
+            }
+
+            const optionMatch = line.match(
+                /^(\s*)(--[a-z0-9-]+(?:\s+<[^>]+>)?)(\s{2,})(.*)$/u
+            );
+            if (optionMatch) {
+                const leading = optionMatch[1] ?? "";
+                const option = optionMatch[2] ?? "";
+                const spacing = optionMatch[3] ?? "  ";
+                const description = optionMatch[4] ?? "";
+                return `${leading}${styler.strong(option)}${spacing}${description}`;
+            }
+
+            if (line.trimStart().startsWith("gh runs-cleanup")) {
+                return styler.muted(line);
+            }
+
+            if (line.trimStart().startsWith("default:")) {
+                return styler.muted(line);
+            }
+
+            return line;
+        })
+        .join("\n");
+}
+
 function createStyler(useColor: boolean): Styler {
     const apply = (code: string, text: string): string =>
         useColor ? `\u001b[${code}m${text}\u001b[0m` : text;
@@ -801,18 +849,6 @@ export function main(argv: string[]): number {
     const options = parseArguments(argv);
     const jsonOutput = options["json"] === true;
 
-    if (options["help"] === true) {
-        console.log(printHelp());
-        return 0;
-    }
-
-    const dryRun = options["dry-run"] === true;
-    const confirm = options["confirm"] === true || options["yes"] === true;
-    const verbose = options["verbose"] === true;
-    const summaryMode = options["summary"] === true;
-    const quiet = options["quiet"] === true;
-    const failFast = options["fail-fast"] === true;
-
     const colorOption =
         options["no-color"] === true
             ? "never"
@@ -821,20 +857,34 @@ export function main(argv: string[]): number {
               ? options["color"].trim().toLowerCase()
               : "auto";
 
-    if (
-        colorOption !== "auto" &&
-        colorOption !== "always" &&
-        colorOption !== "never"
-    ) {
+    const validColorOption =
+        colorOption === "auto" ||
+        colorOption === "always" ||
+        colorOption === "never";
+
+    const colorMode = (validColorOption ? colorOption : "auto") as ColorMode;
+    const styler = createStyler(shouldUseColor(colorMode, jsonOutput));
+
+    if (options["help"] === true) {
+        console.log(renderHelpText(styler));
+        return 0;
+    }
+
+    if (!validColorOption) {
         return emitError(
             "--color must be one of: auto, always, never.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
-    const colorMode = colorOption as ColorMode;
-    const styler = createStyler(shouldUseColor(colorMode, jsonOutput));
+    const dryRun = options["dry-run"] === true;
+    const confirm = options["confirm"] === true || options["yes"] === true;
+    const verbose = options["verbose"] === true;
+    const summaryMode = options["summary"] === true;
+    const quiet = options["quiet"] === true;
+    const failFast = options["fail-fast"] === true;
 
     const unicodeOption =
         options["no-unicode"] === true
