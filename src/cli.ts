@@ -2,6 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { stripVTControlCharacters } from "node:util";
 
 type WorkflowRun = {
     databaseId: number;
@@ -16,6 +17,9 @@ type WorkflowRun = {
 };
 
 type ParsedOptions = Record<string, string | boolean | string[]>;
+
+type ColorMode = "auto" | "always" | "never";
+type UnicodeMode = "auto" | "always" | "never";
 
 type GhResponse = {
     stdout: string;
@@ -44,9 +48,22 @@ type RunSummary = {
     failedIds: number[];
     matched: number;
     repo: string;
+    planned: number;
     skippedByExclusion: number;
     statuses: string[];
     skippedByAge: number;
+};
+
+type Styler = {
+    heading: (text: string) => string;
+    strong: (text: string) => string;
+    info: (text: string) => string;
+    muted: (text: string) => string;
+    ok: (text: string) => string;
+    warn: (text: string) => string;
+    error: (text: string) => string;
+    status: (text: string) => string;
+    count: (value: number) => string;
 };
 
 const VALID_STATUSES = new Set([
@@ -89,7 +106,10 @@ function parseArguments(args: string[]): ParsedOptions {
             key === "all-statuses" ||
             key === "fail-fast" ||
             key === "help" ||
-            key === "json"
+            key === "json" ||
+            key === "summary" ||
+            key === "no-color" ||
+            key === "no-unicode"
         ) {
             parsed[key] = true;
             continue;
@@ -159,8 +179,13 @@ Execution:
     --fail-fast                   Stop deleting after first failed run
     --max-failures <n>            Stop after N failed deletions
   --verbose                     Show per-run details
+    --summary                     Show expanded summaries (tables, grouped counts)
     --quiet                       Reduce non-error output in text mode
   --json                        Emit structured JSON output
+    --color <auto|always|never>   Color mode for text output (default: auto)
+    --no-color                    Alias for --color never
+        --unicode <auto|always|never> Unicode table borders/symbols (default: auto)
+        --no-unicode                  Alias for --unicode never
     --all-statuses                Target all valid statuses
   --help                        Show this help
 
@@ -171,6 +196,315 @@ Examples:
     gh runs-cleanup --repo owner/repo --json --dry-run
     gh runs-cleanup --before-days 30 --status failure --confirm
 `;
+}
+
+function createStyler(useColor: boolean): Styler {
+    const apply = (code: string, text: string): string =>
+        useColor ? `\u001b[${code}m${text}\u001b[0m` : text;
+
+    const status = (text: string): string => {
+        const normalized = text.toLowerCase();
+        if (
+            normalized.includes("failure") ||
+            normalized.includes("timed_out")
+        ) {
+            return apply("31", text);
+        }
+        if (normalized.includes("cancelled") || normalized.includes("stale")) {
+            return apply("33", text);
+        }
+        if (normalized.includes("success")) {
+            return apply("32", text);
+        }
+        if (
+            normalized.includes("in_progress") ||
+            normalized.includes("queued")
+        ) {
+            return apply("36", text);
+        }
+        return apply("90", text);
+    };
+
+    return {
+        heading: (text) => apply("1;36", text),
+        strong: (text) => apply("1", text),
+        info: (text) => apply("36", text),
+        muted: (text) => apply("90", text),
+        ok: (text) => apply("32", text),
+        warn: (text) => apply("33", text),
+        error: (text) => apply("31", text),
+        status,
+        count: (value) =>
+            value === 0
+                ? apply("90", String(value))
+                : value > 0
+                  ? apply("1;36", String(value))
+                  : String(value),
+    };
+}
+
+function visibleLength(value: string): number {
+    return stripVTControlCharacters(value).length;
+}
+
+function padVisible(value: string, width: number): string {
+    const difference = width - visibleLength(value);
+    return difference > 0 ? `${value}${" ".repeat(difference)}` : value;
+}
+
+function shouldUseColor(mode: ColorMode, asJson: boolean): boolean {
+    if (asJson) {
+        return false;
+    }
+
+    if (mode === "always") {
+        return true;
+    }
+
+    if (mode === "never") {
+        return false;
+    }
+
+    if (process.env["NO_COLOR"] !== undefined) {
+        return false;
+    }
+
+    const forced = process.env["FORCE_COLOR"];
+    if (typeof forced === "string") {
+        return forced !== "0";
+    }
+
+    return process.stdout.isTTY;
+}
+
+function shouldUseUnicode(mode: UnicodeMode, asJson: boolean): boolean {
+    if (asJson) {
+        return false;
+    }
+
+    if (mode === "always") {
+        return true;
+    }
+
+    if (mode === "never") {
+        return false;
+    }
+
+    const term = process.env["TERM"];
+    if (term === "dumb") {
+        return false;
+    }
+
+    return process.stdout.isTTY;
+}
+
+function formatTable(
+    headers: string[],
+    rows: string[][],
+    useUnicode: boolean
+): string {
+    const widths = headers.map((header, column) =>
+        Math.max(
+            visibleLength(header),
+            ...rows.map((row) => visibleLength(row[column] ?? ""))
+        )
+    );
+
+    const style = useUnicode
+        ? {
+              tl: "┌",
+              tr: "┐",
+              bl: "└",
+              br: "┘",
+              h: "─",
+              v: "│",
+              j: "┼",
+              tt: "┬",
+              bt: "┴",
+              lt: "├",
+              rt: "┤",
+          }
+        : {
+              tl: "+",
+              tr: "+",
+              bl: "+",
+              br: "+",
+              h: "-",
+              v: "|",
+              j: "+",
+              tt: "+",
+              bt: "+",
+              lt: "+",
+              rt: "+",
+          };
+
+    const horizontal = widths.map((width) => style.h.repeat(width));
+    const top = `${style.tl}${horizontal.join(style.tt)}${style.tr}`;
+    const middle = `${style.lt}${horizontal.join(style.j)}${style.rt}`;
+    const bottom = `${style.bl}${horizontal.join(style.bt)}${style.br}`;
+
+    const renderRow = (cells: string[]): string =>
+        `${style.v} ${cells
+            .map((cell, index) => padVisible(cell, widths[index] ?? 0))
+            .join(` ${style.v} `)} ${style.v}`;
+
+    const lines = [
+        top,
+        renderRow(headers),
+        middle,
+        ...rows.map((row) => renderRow(row)),
+        bottom,
+    ];
+
+    return lines.join("\n");
+}
+
+function toWorkflowName(run: WorkflowRun): string {
+    const value = run.workflowName?.trim();
+    return typeof value === "string" && value.length > 0
+        ? value
+        : "(unknown workflow)";
+}
+
+function toBranchName(run: WorkflowRun): string {
+    const value = run.headBranch?.trim();
+    return typeof value === "string" && value.length > 0
+        ? value
+        : "(no branch)";
+}
+
+function toStatusLabel(run: WorkflowRun): string {
+    const status = run.status?.trim() || "unknown";
+    const conclusion = run.conclusion?.trim();
+    return conclusion ? `${status}/${conclusion}` : status;
+}
+
+function collectCounts(
+    runs: WorkflowRun[],
+    selector: (run: WorkflowRun) => string
+): Array<[name: string, count: number]> {
+    const counts = new Map<string, number>();
+
+    for (const run of runs) {
+        const key = selector(run);
+        const current = counts.get(key) ?? 0;
+        counts.set(key, current + 1);
+    }
+
+    return Array.from(counts.entries()).sort((left, right) => {
+        if (right[1] !== left[1]) {
+            return right[1] - left[1];
+        }
+        return left[0].localeCompare(right[0]);
+    });
+}
+
+function printDryRunWorkflowSummary(
+    runs: WorkflowRun[],
+    styler: Styler,
+    useUnicode: boolean
+): void {
+    console.log("");
+    console.log(styler.heading("Planned deletions by workflow"));
+
+    const counts = collectCounts(runs, toWorkflowName);
+    if (counts.length === 0) {
+        console.log(
+            styler.muted("No workflow runs matched the current filters.")
+        );
+        return;
+    }
+
+    console.log(
+        formatTable(
+            ["Workflow", "Planned deletions"],
+            counts.map(([workflow, count]) => [workflow, String(count)]),
+            useUnicode
+        )
+    );
+}
+
+function printSummaryDetails(
+    runsToProcess: WorkflowRun[],
+    candidates: WorkflowRun[],
+    styler: Styler,
+    useUnicode: boolean
+): void {
+    console.log("");
+    console.log(styler.heading("Summary details"));
+
+    const statusCounts = collectCounts(runsToProcess, toStatusLabel);
+    const branchCounts = collectCounts(runsToProcess, toBranchName).slice(
+        0,
+        10
+    );
+
+    console.log(styler.info("By status"));
+    console.log(
+        formatTable(
+            ["Status", "Count"],
+            statusCounts.map(([status, count]) => [
+                styler.status(status),
+                styler.count(count),
+            ]),
+            useUnicode
+        )
+    );
+
+    console.log("");
+    console.log(styler.info("Top branches"));
+    console.log(
+        formatTable(
+            ["Branch", "Count"],
+            branchCounts.map(([branch, count]) => [
+                branch,
+                styler.count(count),
+            ]),
+            useUnicode
+        )
+    );
+
+    if (candidates.length < runsToProcess.length) {
+        console.log(
+            styler.warn(
+                `Limited by --max-delete: ${candidates.length} of ${runsToProcess.length} matched runs are planned.`
+            )
+        );
+    }
+}
+
+function printVerboseRuns(
+    runs: WorkflowRun[],
+    styler: Styler,
+    useUnicode: boolean
+): void {
+    const rows = runs.slice(0, 50).map((run) => [
+        styler.strong(String(run.databaseId)),
+        styler.status(toStatusLabel(run)),
+        toWorkflowName(run),
+        toBranchName(run),
+        run.createdAt ?? "",
+    ]);
+
+    console.log("");
+    console.log(styler.heading("Run details (first 50)"));
+    console.log(
+        formatTable(
+            [
+                "Run ID",
+                "Status",
+                "Workflow",
+                "Branch",
+                "Created",
+            ],
+            rows,
+            useUnicode
+        )
+    );
+
+    if (runs.length > 50) {
+        console.log(styler.muted(`... and ${runs.length - 50} more`));
+    }
 }
 
 function runGh(args: string[], capture = true): GhResponse {
@@ -189,7 +523,8 @@ function runGh(args: string[], capture = true): GhResponse {
 function emitError(
     message: string,
     category: ErrorCategory,
-    asJson: boolean
+    asJson: boolean,
+    styler?: Styler
 ): number {
     if (asJson) {
         console.error(
@@ -207,7 +542,10 @@ function emitError(
         return 1;
     }
 
-    console.error(`Error: ${message}`);
+    const rendered = styler
+        ? styler.error(`Error: ${message}`)
+        : `Error: ${message}`;
+    console.error(rendered);
     return 1;
 }
 
@@ -398,16 +736,58 @@ function deleteRunWithRetry(
     };
 }
 
-function printTextSummary(summary: RunSummary): void {
-    console.log(`Repo: ${summary.repo}`);
-    console.log(`Statuses: ${summary.statuses.join(", ")}`);
-    console.log(`Matched runs: ${summary.matched}`);
-    console.log(`Skipped by exclusion filters: ${summary.skippedByExclusion}`);
-    console.log(`Skipped by age filter: ${summary.skippedByAge}`);
+function printTextSummary(
+    summary: RunSummary,
+    styler: Styler,
+    useUnicode: boolean
+): void {
+    console.log(styler.heading("Cleanup summary"));
+    console.log(
+        formatTable(
+            ["Metric", "Value"],
+            [
+                ["Repository", summary.repo],
+                ["Statuses", summary.statuses.join(", ")],
+                ["Matched runs", String(summary.matched)],
+                [
+                    "Planned deletions",
+                    styler.strong(styler.count(summary.planned)),
+                ],
+                [
+                    "Skipped by exclusion filters",
+                    String(summary.skippedByExclusion),
+                ],
+                ["Skipped by age filter", String(summary.skippedByAge)],
+            ],
+            useUnicode
+        )
+    );
+
     if (!summary.dryRun) {
-        console.log(`Attempted deletions: ${summary.attempted}`);
-        console.log(`Deleted: ${summary.deleted}`);
-        console.log(`Failed: ${summary.failed}`);
+        console.log("");
+        console.log(styler.info("Deletion results"));
+        console.log(
+            formatTable(
+                ["Metric", "Value"],
+                [
+                    ["Attempted deletions", String(summary.attempted)],
+                    [
+                        "Deleted",
+                        summary.deleted > 0
+                            ? styler.ok(String(summary.deleted))
+                            : styler.muted(String(summary.deleted)),
+                    ],
+                    [
+                        "Failed",
+                        summary.failed > 0
+                            ? styler.error(String(summary.failed))
+                            : styler.ok(String(summary.failed)),
+                    ],
+                ],
+                useUnicode
+            )
+        );
+
         if (summary.failedIds.length > 0) {
             console.log(
                 `Failed IDs (first 50): ${summary.failedIds.slice(0, 50).join(", ")}`
@@ -429,14 +809,63 @@ export function main(argv: string[]): number {
     const dryRun = options["dry-run"] === true;
     const confirm = options["confirm"] === true || options["yes"] === true;
     const verbose = options["verbose"] === true;
+    const summaryMode = options["summary"] === true;
     const quiet = options["quiet"] === true;
     const failFast = options["fail-fast"] === true;
+
+    const colorOption =
+        options["no-color"] === true
+            ? "never"
+            : typeof options["color"] === "string" &&
+                options["color"].length > 0
+              ? options["color"].trim().toLowerCase()
+              : "auto";
+
+    if (
+        colorOption !== "auto" &&
+        colorOption !== "always" &&
+        colorOption !== "never"
+    ) {
+        return emitError(
+            "--color must be one of: auto, always, never.",
+            "validation_error",
+            jsonOutput
+        );
+    }
+
+    const colorMode = colorOption as ColorMode;
+    const styler = createStyler(shouldUseColor(colorMode, jsonOutput));
+
+    const unicodeOption =
+        options["no-unicode"] === true
+            ? "never"
+            : typeof options["unicode"] === "string" &&
+                options["unicode"].length > 0
+              ? options["unicode"].trim().toLowerCase()
+              : "auto";
+
+    if (
+        unicodeOption !== "auto" &&
+        unicodeOption !== "always" &&
+        unicodeOption !== "never"
+    ) {
+        return emitError(
+            "--unicode must be one of: auto, always, never.",
+            "validation_error",
+            jsonOutput,
+            styler
+        );
+    }
+
+    const unicodeMode = unicodeOption as UnicodeMode;
+    const unicodeTables = shouldUseUnicode(unicodeMode, jsonOutput);
 
     if (!dryRun && !confirm) {
         return emitError(
             "Safety stop: pass --confirm to perform deletion, or use --dry-run to preview.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -470,7 +899,8 @@ export function main(argv: string[]): number {
         return emitError(
             "at least one --status value is required.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -481,7 +911,8 @@ export function main(argv: string[]): number {
         return emitError(
             `invalid statuses: ${invalidStatuses.join(", ")}. Valid values: ${Array.from(VALID_STATUSES).join(", ")}`,
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -490,7 +921,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--limit must be a positive integer.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -508,7 +940,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--max-delete must be a positive integer.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -526,7 +959,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--before-days must be a non-negative integer.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -539,7 +973,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--max-retries must be a non-negative integer.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -552,7 +987,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--retry-delay-ms must be a non-negative integer.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -570,7 +1006,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--max-failures must be a positive integer.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -583,7 +1020,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--order must be one of: oldest, newest, none.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -595,7 +1033,8 @@ export function main(argv: string[]): number {
         return emitError(
             "--repo must be in owner/name format.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -607,7 +1046,8 @@ export function main(argv: string[]): number {
         return emitError(
             "unable to resolve repository. Provide --repo <owner/name> or run inside a GitHub repository.",
             "validation_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -618,7 +1058,8 @@ export function main(argv: string[]): number {
         return emitError(
             "gh CLI is not authenticated. Run: gh auth login",
             "auth_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -633,7 +1074,8 @@ export function main(argv: string[]): number {
         return emitError(
             `failed to list runs: ${message}`,
             "gh_cli_error",
-            jsonOutput
+            jsonOutput,
+            styler
         );
     }
 
@@ -685,21 +1127,14 @@ export function main(argv: string[]): number {
               })
             : includedRuns;
 
-    if (verbose && !jsonOutput && !quiet) {
-        for (const run of runsToProcess.slice(0, 50)) {
-            console.log(
-                `- ${run.databaseId} | ${run.status ?? ""}/${run.conclusion ?? ""} | ${run.workflowName ?? ""} | ${run.headBranch ?? ""} | ${run.createdAt ?? ""}`
-            );
-        }
-        if (runsToProcess.length > 50) {
-            console.log(`... and ${runsToProcess.length - 50} more`);
-        }
-    }
-
     const candidates =
         Number.isFinite(maxDelete) && maxDelete !== undefined
             ? runsToProcess.slice(0, maxDelete)
             : runsToProcess;
+
+    if (verbose && !jsonOutput && !quiet) {
+        printVerboseRuns(candidates, styler, unicodeTables);
+    }
 
     let deleted = 0;
     const failedIds: number[] = [];
@@ -746,6 +1181,7 @@ export function main(argv: string[]): number {
         failed: failedIds.length,
         failedIds,
         matched: runsToProcess.length,
+        planned: candidates.length,
         repo: resolvedRepo,
         skippedByExclusion,
         statuses,
@@ -756,10 +1192,21 @@ export function main(argv: string[]): number {
         console.log(JSON.stringify(summary, null, 2));
     } else {
         if (!quiet) {
-            printTextSummary(summary);
+            printTextSummary(summary, styler, unicodeTables);
+            if (dryRun) {
+                printDryRunWorkflowSummary(candidates, styler, unicodeTables);
+            }
+            if (summaryMode) {
+                printSummaryDetails(
+                    runsToProcess,
+                    candidates,
+                    styler,
+                    unicodeTables
+                );
+            }
         }
         if (dryRun && !quiet) {
-            console.log("Dry run complete: no deletions performed.");
+            console.log(styler.ok("Dry run complete: no deletions performed."));
         }
     }
 

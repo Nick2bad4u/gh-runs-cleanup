@@ -118,3 +118,25 @@ test("main returns 1 for invalid order", () => {
     );
     assert.equal(code, 1);
 });
+
+test("main returns 1 for invalid color mode", () => {
+    const code = withSilentConsole(() =>
+        main([
+            "--color",
+            "rainbow",
+            "--dry-run",
+        ])
+    );
+    assert.equal(code, 1);
+});
+
+test("main returns 1 for invalid unicode mode", () => {
+    const code = withSilentConsole(() =>
+        main([
+            "--unicode",
+            "emoji",
+            "--dry-run",
+        ])
+    );
+    assert.equal(code, 1);
+});
