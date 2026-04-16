@@ -165,7 +165,7 @@ Filters:
   --user <login>                Filter by actor
   --commit <sha>                Filter by commit SHA
   --created <date>              GitHub created-date filter (same as gh run list)
-  --limit <n>                   Max runs to fetch per status (default: 200)
+    --limit <n>                   Max runs to fetch per status (default: 500)
     --before-days <n>             Only delete runs older than N days
   --max-delete <n>              Safety cap on number of deletions
     --order <oldest|newest|none>  Processing order (default: oldest)
@@ -696,7 +696,7 @@ function listRuns(
         "--status",
         status,
         "--limit",
-        String(options["limit"] ?? "200"),
+        String(options["limit"] ?? "500"),
         "--json",
         "databaseId,status,conclusion,workflowName,headBranch,event,createdAt,displayTitle,url",
     ];
@@ -986,7 +986,7 @@ export function main(argv: string[]): number {
         );
     }
 
-    const limit = Number.parseInt(String(options["limit"] ?? "200"), 10);
+    const limit = Number.parseInt(String(options["limit"] ?? "500"), 10);
     if (!Number.isFinite(limit) || limit < 1) {
         return emitError(
             "--limit must be a positive integer.",
