@@ -962,6 +962,10 @@ const isDirectExecution =
     typeof process.argv[1] === "string" &&
     fileURLToPath(import.meta.url) === process.argv[1];
 
-if (isDirectExecution) {
+export function runCli(): void {
     process.exitCode = main(process.argv.slice(2));
+}
+
+if (isDirectExecution) {
+    runCli();
 }
