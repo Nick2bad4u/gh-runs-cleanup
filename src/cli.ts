@@ -64,6 +64,8 @@ type Styler = {
     error: (text: string) => string;
     status: (text: string) => string;
     count: (value: number) => string;
+    flag: (text: string) => string;
+    arg: (text: string) => string;
 };
 
 const VALID_STATUSES = new Set([
@@ -150,112 +152,304 @@ function parseArguments(args: string[]): ParsedOptions {
     return parsed;
 }
 
+type HelpOption = {
+    arg?: string;
+    description: string;
+    flag: string;
+};
+
+type HelpSection = {
+    options?: HelpOption[];
+    title: string;
+};
+
+const HELP_SECTIONS: HelpSection[] = [
+    {
+        options: [
+            {
+                arg: "<owner/name>",
+                description:
+                    "Target repository (optional if run inside a repo)",
+                flag: "--repo",
+            },
+            {
+                arg: "<owner/name[,..]>",
+                description: "Multiple target repositories (repeatable)",
+                flag: "--repos",
+            },
+            {
+                description: "Target all repositories for an owner/login",
+                flag: "--all-repos",
+            },
+            {
+                arg: "<login>",
+                description:
+                    "Owner/login used with --all-repos (default: authenticated user)",
+                flag: "--owner",
+            },
+        ],
+        title: "Target repository",
+    },
+    {
+        options: [
+            {
+                arg: "<value[,value...]>",
+                description:
+                    "Run statuses to target (repeatable; default: failure,cancelled)",
+                flag: "--status",
+            },
+            {
+                description: "Target all valid statuses",
+                flag: "--all-statuses",
+            },
+            {
+                arg: "<name|id>",
+                description: "Filter by workflow name or id",
+                flag: "--workflow",
+            },
+            {
+                arg: "<name[,name...]>",
+                description: "Exclude matching workflow names (repeatable)",
+                flag: "--exclude-workflow",
+            },
+            {
+                arg: "<name>",
+                description: "Filter by branch",
+                flag: "--branch",
+            },
+            {
+                arg: "<name[,name...]>",
+                description: "Exclude matching branch names (repeatable)",
+                flag: "--exclude-branch",
+            },
+            {
+                arg: "<event>",
+                description: "Filter by triggering event",
+                flag: "--event",
+            },
+            {
+                arg: "<login>",
+                description: "Filter by actor",
+                flag: "--user",
+            },
+            {
+                arg: "<sha>",
+                description: "Filter by commit SHA",
+                flag: "--commit",
+            },
+            {
+                arg: "<date>",
+                description: "GitHub created-date filter (same as gh run list)",
+                flag: "--created",
+            },
+            {
+                arg: "<n>",
+                description: "Only delete runs older than N days",
+                flag: "--before-days",
+            },
+            {
+                arg: "<n>",
+                description: "Max runs to fetch per status (default: 500)",
+                flag: "--limit",
+            },
+            {
+                arg: "<n>",
+                description: "Safety cap on number of deletions",
+                flag: "--max-delete",
+            },
+            {
+                arg: "<oldest|newest|none>",
+                description: "Processing order (default: oldest)",
+                flag: "--order",
+            },
+        ],
+        title: "Filters",
+    },
+    {
+        options: [
+            {
+                description: "Show what would be deleted without deleting",
+                flag: "--dry-run",
+            },
+            {
+                description: "Required to perform deletion",
+                flag: "--confirm",
+            },
+            {
+                description: "Alias for --confirm",
+                flag: "--yes",
+            },
+            {
+                arg: "<n>",
+                description: "Delete retry attempts (default: 2)",
+                flag: "--max-retries",
+            },
+            {
+                arg: "<n>",
+                description: "Initial retry delay in ms (default: 200)",
+                flag: "--retry-delay-ms",
+            },
+            {
+                description: "Stop deleting after first failed run",
+                flag: "--fail-fast",
+            },
+            {
+                arg: "<n>",
+                description: "Stop after N failed deletions",
+                flag: "--max-failures",
+            },
+            {
+                description: "Show per-run details",
+                flag: "--verbose",
+            },
+            {
+                description: "Show expanded summaries (tables, grouped counts)",
+                flag: "--summary",
+            },
+            {
+                description: "Reduce non-error output in text mode",
+                flag: "--quiet",
+            },
+        ],
+        title: "Execution",
+    },
+    {
+        options: [
+            {
+                description: "Emit structured JSON output",
+                flag: "--json",
+            },
+            {
+                arg: "<auto|always|never>",
+                description: "Color mode for text output (default: auto)",
+                flag: "--color",
+            },
+            {
+                description: "Alias for --color never",
+                flag: "--no-color",
+            },
+            {
+                arg: "<auto|always|never>",
+                description: "Unicode table borders/symbols (default: auto)",
+                flag: "--unicode",
+            },
+            {
+                description: "Alias for --unicode never",
+                flag: "--no-unicode",
+            },
+            {
+                description: "Disable progress bars in interactive terminals",
+                flag: "--no-progress",
+            },
+            {
+                description:
+                    "CI-friendly output (disables interactive formatting)",
+                flag: "--ci",
+            },
+        ],
+        title: "Output",
+    },
+    {
+        options: [
+            {
+                description: "Show this help",
+                flag: "--help",
+            },
+        ],
+        title: "Help",
+    },
+];
+
+const HELP_NOTES = [
+    "--workflow uses compatibility mode, so progress may update less frequently.",
+];
+
+const HELP_EXAMPLES = [
+    "gh runs-cleanup --repo owner/repo --confirm",
+    "gh runs-cleanup --repos owner/repo,owner/other-repo --dry-run",
+    "gh runs-cleanup --all-repos --owner my-user --status failure --confirm",
+    "gh runs-cleanup --repo owner/repo --status failure,cancelled --limit 500 --confirm",
+    'gh runs-cleanup --repo owner/repo --workflow "CI" --branch main --dry-run',
+    "gh runs-cleanup --repo owner/repo --json --dry-run",
+    "gh runs-cleanup --before-days 30 --status failure --confirm",
+];
+
+function styleCommandExample(command: string, styler?: Styler): string {
+    if (!styler) {
+        return command;
+    }
+
+    return command
+        .split(/(\s+)/u)
+        .map((token) =>
+            token.startsWith("--")
+                ? styler.flag(token)
+                : token.startsWith("<") && token.endsWith(">")
+                  ? styler.arg(token)
+                  : token
+        )
+        .join("");
+}
+
+function buildHelpText(styler?: Styler): string {
+    const heading = (text: string): string =>
+        styler ? styler.info(text) : text;
+    const flag = (text: string): string => (styler ? styler.flag(text) : text);
+    const arg = (text: string): string => (styler ? styler.arg(text) : text);
+    const title = (text: string): string =>
+        styler ? styler.heading(text) : text;
+
+    const optionLabelWidths = HELP_SECTIONS.flatMap((section) =>
+        (section.options ?? []).map(
+            (option) =>
+                `${option.flag}${option.arg ? ` ${option.arg}` : ""}`.length
+        )
+    );
+    const maxLabelWidth = Math.max(...optionLabelWidths, 0);
+
+    const lines: string[] = [];
+    lines.push(title("gh-runs-cleanup"));
+    lines.push("");
+    lines.push("  Delete GitHub Actions workflow runs using the gh CLI.");
+    lines.push("");
+    lines.push(heading("  Usage:"));
+    lines.push(
+        `    ${styleCommandExample("gh runs-cleanup", styler)} ${arg("[options]")}`
+    );
+    lines.push("");
+
+    for (const section of HELP_SECTIONS) {
+        lines.push(heading(`  ${section.title}:`));
+        for (const option of section.options ?? []) {
+            const labelPlain = `${option.flag}${option.arg ? ` ${option.arg}` : ""}`;
+            const labelStyled = `${flag(option.flag)}${option.arg ? ` ${arg(option.arg)}` : ""}`;
+            const spacing = " ".repeat(maxLabelWidth - labelPlain.length + 2);
+            lines.push(`    ${labelStyled}${spacing}${option.description}`);
+        }
+        lines.push("");
+    }
+
+    lines.push(heading("  Notes:"));
+    for (const note of HELP_NOTES) {
+        lines.push(`    ${styleCommandExample(note, styler)}`);
+    }
+    lines.push("");
+
+    lines.push(heading("  Examples:"));
+    for (const example of HELP_EXAMPLES) {
+        lines.push(`    ${styleCommandExample(example, styler)}`);
+    }
+    lines.push("  ");
+
+    return lines.join("\n");
+}
+
 function printHelp(): string {
-    return `gh-runs-cleanup
-
-Delete GitHub Actions workflow runs using gh CLI.
-
-Target repository:
-    --repo <owner/name>           Target repository (optional if run inside a repo)
-    --repos <owner/name[,..]>     Multiple target repositories (repeatable)
-    --all-repos                   Target all repositories for an owner/login
-    --owner <login>               Owner/login used with --all-repos (default: authenticated user)
-
-Filters:
-  --status <value[,value...]>   Run statuses to target (repeatable)
-                                default: failure,cancelled
-  --workflow <name|id>          Filter by workflow name or id
-    --exclude-workflow <name[,name...]>  Exclude matching workflow names (repeatable)
-  --branch <name>               Filter by branch
-    --exclude-branch <name[,name...]>    Exclude matching branch names (repeatable)
-  --event <event>               Filter by triggering event
-  --user <login>                Filter by actor
-  --commit <sha>                Filter by commit SHA
-  --created <date>              GitHub created-date filter (same as gh run list)
-    --limit <n>                   Max runs to fetch per status (default: 500)
-    --before-days <n>             Only delete runs older than N days
-  --max-delete <n>              Safety cap on number of deletions
-    --order <oldest|newest|none>  Processing order (default: oldest)
-
-Execution:
-  --dry-run                     Show what would be deleted without deleting
-  --confirm                     Required to perform deletion
-    --yes                         Alias for --confirm
-    --max-retries <n>             Delete retry attempts (default: 2)
-    --retry-delay-ms <n>          Initial retry delay in ms (default: 200)
-    --fail-fast                   Stop deleting after first failed run
-    --max-failures <n>            Stop after N failed deletions
-  --verbose                     Show per-run details
-    --summary                     Show expanded summaries (tables, grouped counts)
-    --quiet                       Reduce non-error output in text mode
-  --json                        Emit structured JSON output
-    --color <auto|always|never>   Color mode for text output (default: auto)
-    --no-color                    Alias for --color never
-        --unicode <auto|always|never> Unicode table borders/symbols (default: auto)
-        --no-unicode                  Alias for --unicode never
-        --no-progress                 Disable progress bars in interactive terminals
-        --ci                          CI-friendly output (disables interactive formatting)
-                                                                Note: with --workflow, fetch uses compatibility mode and progress may update less frequently.
-    --all-statuses                Target all valid statuses
-  --help                        Show this help
-
-Examples:
-    gh runs-cleanup --repo owner/repo --confirm
-    gh runs-cleanup --repos owner/repo,owner/other-repo --dry-run
-    gh runs-cleanup --all-repos --owner my-user --status failure --confirm
-    gh runs-cleanup --repo owner/repo --status failure,cancelled --limit 500 --confirm
-    gh runs-cleanup --repo owner/repo --workflow "CI" --branch main --dry-run
-    gh runs-cleanup --repo owner/repo --json --dry-run
-    gh runs-cleanup --before-days 30 --status failure --confirm
-`;
+    return buildHelpText();
 }
 
 function renderHelpText(styler: Styler): string {
-    const helpText = printHelp();
-    const sectionLines = new Set([
-        "Target repository:",
-        "Filters:",
-        "Execution:",
-        "Examples:",
-    ]);
-
-    return helpText
-        .split("\n")
-        .map((line, index) => {
-            if (line.length === 0) {
-                return line;
-            }
-
-            if (index === 0) {
-                return styler.heading(line);
-            }
-
-            if (sectionLines.has(line.trim())) {
-                return styler.info(line);
-            }
-
-            const optionMatch = line.match(
-                /^(\s*)(--[a-z0-9-]+(?:\s+<[^>]+>)?)(\s{2,})(.*)$/u
-            );
-            if (optionMatch) {
-                const leading = optionMatch[1] ?? "";
-                const option = optionMatch[2] ?? "";
-                const spacing = optionMatch[3] ?? "  ";
-                const description = optionMatch[4] ?? "";
-                return `${leading}${styler.strong(option)}${spacing}${description}`;
-            }
-
-            if (line.trimStart().startsWith("gh runs-cleanup")) {
-                return styler.muted(line);
-            }
-
-            if (line.trimStart().startsWith("default:")) {
-                return styler.muted(line);
-            }
-
-            return line;
-        })
-        .join("\n");
+    return buildHelpText(styler);
 }
 
 function createStyler(useColor: boolean): Styler {
@@ -300,6 +494,8 @@ function createStyler(useColor: boolean): Styler {
                 : value > 0
                   ? apply("1;36", String(value))
                   : String(value),
+        flag: (text) => apply("38;5;51", text), // Bright cyan for flags
+        arg: (text) => apply("38;5;221", text), // Bright yellow for arguments
     };
 }
 
