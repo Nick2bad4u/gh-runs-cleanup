@@ -610,7 +610,7 @@ function buildExecutionConfig(
     if (allStatuses) {
         rawStatusValues = [Array.from(VALID_STATUSES).join(",")];
     } else if (Array.isArray(options["status"])) {
-        rawStatusValues = options["status"] as string[];
+        rawStatusValues = options["status"];
     } else if (typeof options["status"] === "string") {
         rawStatusValues = [options["status"]];
     } else {
