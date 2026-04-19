@@ -519,13 +519,15 @@ function buildExecutionConfig(
     const ciMode = options["ci"] === true;
     const noProgress = options["no-progress"] === true;
 
-    const colorOption =
-        ciMode || options["no-color"] === true
-            ? "never"
-            : typeof options["color"] === "string" &&
-                options["color"].length > 0
-              ? options["color"].trim().toLowerCase()
-              : "auto";
+    let colorOption = "auto";
+    if (ciMode || options["no-color"] === true) {
+        colorOption = "never";
+    } else if (
+        typeof options["color"] === "string" &&
+        options["color"].length > 0
+    ) {
+        colorOption = options["color"].trim().toLowerCase();
+    }
 
     const validColorOption =
         colorOption === "auto" ||
@@ -556,13 +558,15 @@ function buildExecutionConfig(
     const quiet = options["quiet"] === true;
     const failFast = options["fail-fast"] === true;
 
-    const unicodeOption =
-        ciMode || options["no-unicode"] === true
-            ? "never"
-            : typeof options["unicode"] === "string" &&
-                options["unicode"].length > 0
-              ? options["unicode"].trim().toLowerCase()
-              : "auto";
+    let unicodeOption = "auto";
+    if (ciMode || options["no-unicode"] === true) {
+        unicodeOption = "never";
+    } else if (
+        typeof options["unicode"] === "string" &&
+        options["unicode"].length > 0
+    ) {
+        unicodeOption = options["unicode"].trim().toLowerCase();
+    }
 
     if (
         unicodeOption !== "auto" &&
@@ -602,13 +606,16 @@ function buildExecutionConfig(
         )
     );
 
-    const rawStatusValues = allStatuses
-        ? [Array.from(VALID_STATUSES).join(",")]
-        : Array.isArray(options["status"])
-          ? options["status"]
-          : typeof options["status"] === "string"
-            ? [options["status"]]
-            : ["failure,cancelled"];
+    let rawStatusValues: string[];
+    if (allStatuses) {
+        rawStatusValues = [Array.from(VALID_STATUSES).join(",")];
+    } else if (Array.isArray(options["status"])) {
+        rawStatusValues = options["status"] as string[];
+    } else if (typeof options["status"] === "string") {
+        rawStatusValues = [options["status"]];
+    } else {
+        rawStatusValues = ["failure,cancelled"];
+    }
 
     const statuses = rawStatusValues
         .flatMap((part) => part.split(","))

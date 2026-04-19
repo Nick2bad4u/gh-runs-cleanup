@@ -222,6 +222,12 @@ const HELP_EXAMPLES = [
     "gh runs-cleanup --before-days 30 --status failure --confirm",
 ];
 
+function styleToken(token: string, styler: Styler): string {
+    if (token.startsWith("--")) return styler.flag(token);
+    if (token.startsWith("<") && token.endsWith(">")) return styler.arg(token);
+    return token;
+}
+
 function styleCommandExample(command: string, styler?: Styler): string {
     if (!styler) {
         return command;
@@ -229,13 +235,7 @@ function styleCommandExample(command: string, styler?: Styler): string {
 
     return command
         .split(/(\s+)/u)
-        .map((token) =>
-            token.startsWith("--")
-                ? styler.flag(token)
-                : token.startsWith("<") && token.endsWith(">")
-                  ? styler.arg(token)
-                  : token
-        )
+        .map((token) => styleToken(token, styler))
         .join("");
 }
 
@@ -248,29 +248,31 @@ export function buildHelpText(styler?: Styler): string {
         styler ? styler.heading(text) : text;
 
     const optionLabelWidths = HELP_SECTIONS.flatMap((section) =>
-        (section.options ?? []).map(
-            (option) =>
-                `${option.flag}${option.arg ? ` ${option.arg}` : ""}`.length
-        )
+        (section.options ?? []).map((option) => {
+            const argSuffix = option.arg ? ` ${option.arg}` : "";
+            return `${option.flag}${argSuffix}`.length;
+        })
     );
     const maxLabelWidth = Math.max(...optionLabelWidths, 0);
 
     const lines: string[] = [];
-    lines.push(title("gh-runs-cleanup"));
-    lines.push("");
-    lines.push("  Delete GitHub Actions workflow runs using the gh CLI.");
-    lines.push("");
-    lines.push(heading("  Usage:"));
     lines.push(
-        `    ${styleCommandExample("gh runs-cleanup", styler)} ${arg("[options]")}`
+        title("gh-runs-cleanup"),
+        "",
+        "  Delete GitHub Actions workflow runs using the gh CLI.",
+        "",
+        heading("  Usage:"),
+        `    ${styleCommandExample("gh runs-cleanup", styler)} ${arg("[options]")}`,
+        ""
     );
-    lines.push("");
 
     for (const section of HELP_SECTIONS) {
         lines.push(heading(`  ${section.title}:`));
         for (const option of section.options ?? []) {
-            const labelPlain = `${option.flag}${option.arg ? ` ${option.arg}` : ""}`;
-            const labelStyled = `${flag(option.flag)}${option.arg ? ` ${arg(option.arg)}` : ""}`;
+            const plainArgPart = option.arg ? ` ${option.arg}` : "";
+            const styledArgPart = option.arg ? ` ${arg(option.arg)}` : "";
+            const labelPlain = `${option.flag}${plainArgPart}`;
+            const labelStyled = `${flag(option.flag)}${styledArgPart}`;
             const spacing = " ".repeat(maxLabelWidth - labelPlain.length + 2);
             lines.push(`    ${labelStyled}${spacing}${option.description}`);
         }
@@ -281,9 +283,7 @@ export function buildHelpText(styler?: Styler): string {
     for (const note of HELP_NOTES) {
         lines.push(`    ${styleCommandExample(note, styler)}`);
     }
-    lines.push("");
-
-    lines.push(heading("  Examples:"));
+    lines.push("", heading("  Examples:"));
     for (const example of HELP_EXAMPLES) {
         lines.push(`    ${styleCommandExample(example, styler)}`);
     }

@@ -38,12 +38,11 @@ export function createStyler(useColor: boolean): Styler {
         warn: (text) => apply("33", text),
         error: (text) => apply("31", text),
         status,
-        count: (value) =>
-            value === 0
-                ? apply("90", String(value))
-                : value > 0
-                  ? apply("1;36", String(value))
-                  : String(value),
+        count: (value) => {
+            if (value === 0) return apply("90", String(value));
+            if (value > 0) return apply("1;36", String(value));
+            return String(value);
+        },
         flag: (text) => apply("38;5;51", text),
         arg: (text) => apply("38;5;221", text),
     };
@@ -149,10 +148,11 @@ export function formatTable(
     const middle = `${style.lt}${horizontal.join(style.j)}${style.rt}`;
     const bottom = `${style.bl}${horizontal.join(style.bt)}${style.br}`;
 
+    const cellSep = ` ${style.v} `;
     const renderRow = (cells: string[]): string =>
         `${style.v} ${cells
             .map((cell, index) => padVisible(cell, widths[index] ?? 0))
-            .join(` ${style.v} `)} ${style.v}`;
+            .join(cellSep)} ${style.v}`;
 
     const lines = [
         top,
@@ -187,6 +187,14 @@ export type ProgressState = {
     update: (completed: number, suffix?: string) => void;
 };
 
+function computeSuffixText(budget: number | undefined, suffix: string): string {
+    if (typeof budget !== "number") return suffix;
+    if (budget <= 0) return "";
+    return suffix.length <= budget
+        ? suffix
+        : `${suffix.slice(0, Math.max(0, budget - 1))}\u2026`;
+}
+
 export function createProgressBar(
     title: string,
     total: number,
@@ -216,16 +224,11 @@ export function createProgressBar(
                 ? Math.max(0, terminalWidth - plainPrefix.length - 1)
                 : undefined;
 
-        const suffixText =
-            typeof suffixBudget === "number"
-                ? suffixBudget <= 0
-                    ? ""
-                    : suffix.length <= suffixBudget
-                      ? suffix
-                      : `${suffix.slice(0, Math.max(0, suffixBudget - 1))}…`
-                : suffix;
-
-        const line = `${styler.info(title)} ${styler.muted("[")}${styler.ok(bar)}${styler.muted("]")} ${styler.strong(progressText)} ${styler.muted(`${percent}%`)}${suffixText.length > 0 ? ` ${styler.muted(suffixText)}` : ""}`;
+        const suffixText = computeSuffixText(suffixBudget, suffix);
+        const percentStr = `${percent}%`;
+        const suffixPart =
+            suffixText.length > 0 ? ` ${styler.muted(suffixText)}` : "";
+        const line = `${styler.info(title)} ${styler.muted("[")}${styler.ok(bar)}${styler.muted("]")} ${styler.strong(progressText)} ${styler.muted(percentStr)}${suffixPart}`;
         process.stdout.write(`\r\u001b[2K${line}`);
     };
 
