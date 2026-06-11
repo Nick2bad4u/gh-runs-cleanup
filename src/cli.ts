@@ -32,7 +32,6 @@ import {
     type ParsedOptions,
     type RunSummary,
     type Styler,
-    type UnicodeMode,
     type WorkflowRun,
     VALID_STATUSES,
 } from "./cli-types.js";
@@ -581,8 +580,7 @@ function buildExecutionConfig(
         );
     }
 
-    const unicodeMode = unicodeOption as UnicodeMode;
-    const unicodeTables = shouldUseUnicode(unicodeMode, jsonOutput);
+    const unicodeTables = shouldUseUnicode(unicodeOption, jsonOutput);
 
     if (!dryRun && !confirm) {
         return emitError(
@@ -967,6 +965,7 @@ export function main(argv: string[]): number {
 
 const isDirectExecution =
     typeof process.argv[1] === "string" &&
+    typeof import.meta.url === "string" &&
     fileURLToPath(import.meta.url) === process.argv[1];
 
 export function runCli(): void {

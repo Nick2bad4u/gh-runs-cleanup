@@ -59,6 +59,7 @@ jobs:
             CI: "true"
             DEFAULT_RELEASE_BRANCH: "main"
             RELEASE_NOTES_PATH: temp/release-notes.md
+            WINDOWS_NODE_DIR: temp/node-windows-x64
         concurrency:
             group: release-pipeline
             cancel-in-progress: false
@@ -212,6 +213,21 @@ jobs:
               if: github.event_name == 'workflow_dispatch'
               run: npm run build
 
+            - name: Build Linux extension asset
+              run: npm run build:assets -- --platform linux --arch amd64
+
+            - name: Download Windows Node.js runtime
+              run: |
+                  set -euo pipefail
+                  node_version="$(cat .node-version)"
+                  mkdir -p temp
+                  curl -fsSLo temp/node-windows-x64.zip "https://nodejs.org/dist/v${node_version}/node-v${node_version}-win-x64.zip"
+                  unzip -q temp/node-windows-x64.zip -d temp
+                  mv "temp/node-v${node_version}-win-x64" "${WINDOWS_NODE_DIR}"
+
+            - name: Build Windows extension asset
+              run: npm run build:assets -- --platform windows --arch amd64 --node-executable "${WINDOWS_NODE_DIR}/node.exe"
+
             - name: Commit and push release version + tag
               if: github.event_name == 'workflow_dispatch'
               env:
@@ -293,6 +309,9 @@ jobs:
                   name: ${{ steps.version.outputs.tag }}
                   body_path: ${{ env.RELEASE_NOTES_PATH }}
                   generate_release_notes: false
+                  files: |
+                      dist/${{ steps.version.outputs.package_name }}-linux-amd64
+                      dist/${{ steps.version.outputs.package_name }}-windows-amd64.exe
                   fail_on_unmatched_files: false
                   overwrite_files: true
               env:
