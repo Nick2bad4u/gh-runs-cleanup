@@ -28,6 +28,7 @@ electron-app/package-lock.json
 
 # Ignore specific files
 **/coverage-results.json
+.gitattributes
 
 # Ignore prompts (Changed " to ' for tools messes up agents)
 

@@ -170,7 +170,10 @@ type ProcessRepositoryParams = {
     maxFailures: number | undefined;
     maxRetries: number;
     noProgress: boolean;
-    order: "oldest" | "newest" | "none";
+    order:
+        | "oldest"
+        | "newest"
+        | "none";
     options: ParsedOptions;
     quiet: boolean;
     repoIndex: number;
@@ -500,7 +503,10 @@ type ExecutionConfig = {
     maxRetries: number;
     noProgress: boolean;
     options: ParsedOptions;
-    order: "oldest" | "newest" | "none";
+    order:
+        | "oldest"
+        | "newest"
+        | "none";
     quiet: boolean;
     retryDelayMs: number;
     statuses: string[];

@@ -1,0 +1,67 @@
+# Remark ignore patterns
+# Configuration files
+*.config.*
+*.js
+*.mjs
+.remarkrc.*
+
+# Build and output directories
+**/.cache/
+**/coverage/
+**/dist-*/
+**/dist/
+**/node_modules/
+**/playwright-report/
+**/temp/
+**/test-results/
+**/tmp/
+**/target/
+**/vendor/
+**/snapshots/
+
+
+# Binary and media files
+*.gif
+*.ico
+*.jpeg
+*.jpg
+*.pdf
+*.png
+*.wasm
+
+# Temporary files
+**/*.swp
+**/*.tmp
+**/*~
+
+# Generated content
+**/auto-generated/
+**/build/
+**/dist/
+**/generated/
+
+# API reference files (if auto-generated)
+**/api-reference/
+
+# Changelog and similar files with different formatting needs
+**/CHANGELOG.md
+**/HISTORY.md
+
+# Documentation that may have different formatting requirements
+**/LICENSE
+docs/docusaurus/build/
+docs/docusaurus/docs/
+docs/docusaurus/node_modules/
+
+# Non-prose instruction and GitHub template files
+**/AGENTS.md
+.github/ISSUE_TEMPLATE/**/*.md
+.github/PULL_REQUEST_TEMPLATE/**/*.md
+.github/pull_request_template.md
+
+# Docusaurus API reference files (if auto-generated)
+**/site-docs/developer/api/
+test/fixtures/
+
+**/agent-commit-message-instructions.md
+.github/agent-commit-message-instructions.md

@@ -10,10 +10,21 @@ export type WorkflowRun = {
     url?: string;
 };
 
-export type ParsedOptions = Record<string, string | boolean | string[]>;
+export type ParsedOptions = Record<
+    string,
+    | string
+    | boolean
+    | string[]
+>;
 
-export type ColorMode = "auto" | "always" | "never";
-export type UnicodeMode = "auto" | "always" | "never";
+export type ColorMode =
+    | "auto"
+    | "always"
+    | "never";
+export type UnicodeMode =
+    | "auto"
+    | "always"
+    | "never";
 
 export type GhResponse = {
     stdout: string;

@@ -11,7 +11,10 @@ export function getCreatedAtEpoch(run: WorkflowRun): number {
 
 export function sortRuns(
     runs: WorkflowRun[],
-    order: "oldest" | "newest" | "none"
+    order:
+        | "oldest"
+        | "newest"
+        | "none"
 ): WorkflowRun[] {
     if (order === "none") {
         return runs;

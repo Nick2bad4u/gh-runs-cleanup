@@ -584,7 +584,7 @@ th,
 td {
     padding: 0.8rem 0.7rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    text-align: left;
+    text-align: start;
     vertical-align: top;
 }
 
