@@ -106,7 +106,7 @@
         "stylelint": "^17.14.0",
         "stylelint-config-nick2bad4u": "^1.0.20",
         "tsdoc-config-nick2bad4u": "^1.0.6",
-        "typescript": "^6.0.3",
+        "typescript": "^7.0.2",
         "typescript-eslint": "^8.63.0",
         "yamllint-config-nick2bad4u": "^1.1.1"
     },
