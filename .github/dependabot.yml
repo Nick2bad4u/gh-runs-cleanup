@@ -44,8 +44,9 @@ updates:
       rebase-strategy: "auto"
       versioning-strategy: "increase"
       allow:
-          # Allow both direct and indirect updates for all packages
-          - dependency-type: "all"
+          # Limit version updates to declared dependencies. Updating every
+          # transitive lockfile package exceeds Dependabot's updater budget.
+          - dependency-type: "direct"
       ignore:
           - dependency-name: "electron-builder"
             versions: ["< 26.0.18"]
