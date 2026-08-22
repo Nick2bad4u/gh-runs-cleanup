@@ -225,6 +225,11 @@ export function main(argv: readonly string[]): number {
     return hasFailures ? 2 : 0;
 }
 
+/** Execute the CLI using the current process arguments. */
+export function runCli(): void {
+    process.exitCode = main(process.argv.slice(2));
+}
+
 function assignParsedArgument(
     parsed: Readonly<ParsedOptions>,
     argument: ParsedArgument
@@ -1134,18 +1139,4 @@ function selectRuns(
 
 function succeed<T>(value: T): SuccessResult<T> {
     return { ok: true, value };
-}
-
-const isDirectExecution =
-    typeof process.argv[1] === "string" &&
-    typeof import.meta.url === "string" &&
-    import.meta.filename === process.argv[1];
-
-/** Execute the CLI using the current process arguments. */
-export function runCli(): void {
-    process.exitCode = main(process.argv.slice(2));
-}
-
-if (isDirectExecution) {
-    runCli();
 }

@@ -7,7 +7,7 @@ import type {
     WorkflowRun,
 } from "../src/cli-types.ts";
 
-import { main } from "../src/cli.ts";
+import { main, runCli } from "../src/cli.ts";
 
 const ghMocks = vi.hoisted(() => ({
     deleteRunWithRetry:
@@ -217,6 +217,30 @@ describe("main validation", () => {
 
         expect(code).toBe(0);
         expect(code).not.toBe(1);
+    });
+
+    it("runs the current process arguments through the executable wrapper", () => {
+        expect.assertions(2);
+
+        const originalArgv = process.argv;
+        const originalExitCode = process.exitCode;
+        const logSpy = vi.spyOn(console, "log").mockReturnValue(undefined);
+
+        try {
+            process.argv = [
+                process.execPath,
+                "gh-runs-cleanup",
+                "--help",
+            ];
+            runCli();
+
+            expect(process.exitCode).toBe(0);
+            expect(logSpy.mock.calls.join("\n")).toContain("gh-runs-cleanup");
+        } finally {
+            process.argv = originalArgv;
+            process.exitCode = originalExitCode;
+            logSpy.mockRestore();
+        }
     });
 
     it("rejects invalid repositories before checking authentication", () => {

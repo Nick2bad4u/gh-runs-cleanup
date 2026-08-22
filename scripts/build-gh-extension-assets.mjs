@@ -94,9 +94,11 @@ function run(command, argumentList) {
 /**
  * @param {string} executablePath
  * @param {string} expectedHeading
+ * @param {string} argv0
  */
-function smokeTestExecutable(executablePath, expectedHeading) {
+function smokeTestExecutable(executablePath, expectedHeading, argv0) {
     const result = spawnSync(executablePath, ["--help"], {
+        argv0,
         cwd: repositoryRoot,
         encoding: "utf8",
     });
@@ -158,7 +160,11 @@ await rm(temporaryDirectory, { force: true, recursive: true });
 await mkdir(temporaryDirectory, { recursive: true });
 await mkdir(distributionDirectory, { recursive: true });
 
-await writeFile(entrypointPath, 'import "../../src/cli.ts";\n', "utf8");
+await writeFile(
+    entrypointPath,
+    'import { runCli } from "../../src/cli.ts";\n\nrunCli();\n',
+    "utf8"
+);
 
 await build({
     bundle: true,
@@ -212,6 +218,9 @@ if (
     platform === osNames.get(process.platform) &&
     architecture === architectureNames.get(process.arch)
 ) {
-    smokeTestExecutable(outputPath, packageName);
-    console.log(`Smoke-tested ${outputFileName}`);
+    smokeTestExecutable(outputPath, packageName, outputPath);
+    smokeTestExecutable(outputPath, packageName, packageName);
+    console.log(
+        `Smoke-tested ${outputFileName} directly and through GitHub CLI argv semantics`
+    );
 }
