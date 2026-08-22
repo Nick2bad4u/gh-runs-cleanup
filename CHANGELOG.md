@@ -5,13 +5,23 @@
 
 ## ✨ What's Changed
 
-- <b>Commit Range: ➡️</b> [`v2.0.0...321f6f6`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v2.0.0...321f6f658df11e99f7f894f2dff4c567e812bfe0 "View full commit range on GitHub")
+- <b>Commit Range: ➡️</b> [`v2.0.0...5d07642`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v2.0.0...5d076425500d0fbbdc673884df837d9993d8daf8 "View full commit range on GitHub")
 
 ### 🛠️ Bug Fixes
 
 - [`321f6f6`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/321f6f658df11e99f7f894f2dff4c567e812bfe0 "Diff: 3 files, +20 | -20") — 🐛 [fix] Run packaged extension through explicit entrypoint&nbsp;<sub><em>(3&nbsp;files,&nbsp;+20,&nbsp;-20)</em></sub>
   - Remove import-time execution from the CLI module and make both source and SEA wrappers call runCli explicitly.
   - Regression-test native assets with GitHub CLI's alternate argv0 semantics so an extension cannot silently exit again.
+
+### 📝 Documentation
+
+- [`6c4ec96`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/6c4ec9641c3542bad3b37cd0d12a3fdf48fe35e7 "Diff: 1 file, +19 | -1") — 📝 [docs] Document packaged entrypoint repair&nbsp;<sub><em>(1&nbsp;file,&nbsp;+19,&nbsp;-1)</em></sub>
+  - Regenerate the unreleased changelog from v2.0.0 through the explicit-entrypoint fix and preserve the published v2.0.0 history.
+
+### 🧪 Testing
+
+- [`5d07642`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/5d076425500d0fbbdc673884df837d9993d8daf8 "Diff: 1 file, +21 | -1") — ✅ [test] Cover executable CLI wrapper&nbsp;<sub><em>(1&nbsp;file,&nbsp;+21,&nbsp;-1)</em></sub>
+  - Invoke runCli with controlled process arguments, assert help output and exit status, and restore argv and exit state after the regression check.
 
 ## ✨ What's Changed in v2.0.0
 
