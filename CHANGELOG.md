@@ -5,9 +5,18 @@
 
 ## ✨ What's Changed
 
-- <b>Commit Range: ➡️</b> [`v1.0.1...4d5a863`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v1.0.1...4d5a863af52fcfd27a6b555c3053d822c0f4553e "View full commit range on GitHub")
+- <b>Commit Range: ➡️</b> [`v1.0.1...6cc9eba`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v1.0.1...6cc9eba62744f714d0ae768eb79f12fc27093293 "View full commit range on GitHub")
+
+### 🛠️ Bug Fixes
+
+- [`6cc9eba`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/6cc9eba62744f714d0ae768eb79f12fc27093293 "Diff: 5 files, +46 | -7") — 🐛 [fix] Stabilize generated changelog formatting&nbsp;<sub><em>(5&nbsp;files,&nbsp;+46,&nbsp;-7)</em></sub>
+  - Render Dependabot brackets as formatter-stable HTML entities and converge Prettier output to a verified fixed point before writing CHANGELOG.md.
+  - Keep the convergence loop bounded, linted through a narrowly scoped sequential-await exception, and covered by the existing normalization tests.
 
 ### 🚜 Refactor
+
+- [`ecf5905`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/ecf59058637cb65ba0a96db472aafb50a503652d "Diff: 49 files, +13455 | -18078") — 🚜 [refactor] Modernize CLI safety and release verification (#13)&nbsp;<sub><em>(49&nbsp;files,&nbsp;+13455,&nbsp;-18078)</em></sub>
+  - 🚜 [refactor] Modernize CLI safety and release verification
 
 - [`4d5a863`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/4d5a863af52fcfd27a6b555c3053d822c0f4553e "Diff: 46 files, +11878 | -18076") — 🚜 [refactor] Modernize CLI safety and release verification&nbsp;<sub><em>(46&nbsp;files,&nbsp;+11878,&nbsp;-18076)</em></sub>
   - 🐛 [fix] Harden repository targeting, numeric parsing, run normalization, filtering, retry handling, structured errors, table rendering, and unknown-age exclusion so destructive selections fail safely.
@@ -17,6 +26,12 @@
   - 🔒️ [chore] Adopt npm 12 exact install-script approvals, zero-vulnerability dependency updates, current pinned actions, shared secret scanning policy, Codeowners, Gitleaks, CodeQL, and Sonar/Codecov configuration.
   - 🎨 [style] Modernize the static site CSS and HTML for logical properties, responsive rendering, accessible metadata, and synchronized Node requirements.
   - 🔨 [build] Add durable changelog normalization and npm refresh helpers for generated Markdown and nested npm 12 policy compatibility.
+
+### 📝 Documentation
+
+- [`7ceb958`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/7ceb9588ba7057a5bb9f2cc776af652d96812aee "Diff: 1 file, +1551 | -0") — 📝 [docs] Add generated repository changelog&nbsp;<sub><em>(1&nbsp;file,&nbsp;+1551,&nbsp;-0)</em></sub>
+  - 📝 [docs] Capture the complete change history since v1.0.1, including the CLI safety modernization and release hardening commit.
+  - 🔨 [build] Normalize Dependabot-style bracket prefixes so generated entries remain valid Markdown and link checks do not interpret dependency scopes as local paths.
 
 ### 🧹 Chores
 
@@ -28,6 +43,14 @@
   - Preserve the GitHub CLI extension behavior while keeping heavyweight duplicate and link checks outside lint:all.
 
 ### 👷 CI/CD
+
+- [`8fab51a`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/8fab51a530f090f84c7b4bd070fd71e13a5fa895 "Diff: 3 files, +27 | -4") — 💚 [ci] Make TOML formatting platform-independent&nbsp;<sub><em>(3&nbsp;files,&nbsp;+27,&nbsp;-4)</em></sub>
+  - 🔧 [chore] Add a repository-scoped Tombi configuration so local user preferences cannot change lint output across Windows and Linux.
+  - 🎨 [style] Reformat the Gitleaks configuration with the project-owned Tombi rules and leave TOML ownership out of Prettier.
+
+- [`f765d3b`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/f765d3b69cdce773c865cda68e8f3be72572040b "Diff: 2 files, +121 | -120") — 💚 [ci] Keep generated changelog formatting stable&nbsp;<sub><em>(2&nbsp;files,&nbsp;+121,&nbsp;-120)</em></sub>
+  - 🎨 [style] Apply Prettier's canonical table alignment to the generated changelog so the remote formatting gate matches local generation.
+  - 🔨 [build] Add a dedicated changelog formatter and run it automatically after normalization to prevent the generated artifact from regressing CI.
 
 - [`e64f7fc`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/e64f7fce1b3fef5064dd86fa99e316a9ace1781d "Diff: 1 file, +3 | -2") — 👷 [ci] Bound Dependabot npm updates&nbsp;<sub><em>(1&nbsp;file,&nbsp;+3,&nbsp;-2)</em></sub>
 
@@ -53,7 +76,7 @@
 - [Release notes](https://github.com/softprops/action-gh-release/releases)
 - [Changelog](https://github.com/softprops/action-gh-release/blob/master/CHANGELOG.md)
 - [Commits](https://github.com/softprops/action-gh-release/compare/b4309332981a82ec1c5618f44dd2e27cc8bfbfda...718ea10b132b3b2eba29c1007bb80653f286566b)
-  \[dependabot\]\[all\](deps): [dependency] Update dependency group
+  &#91;dependabot&#93;&#91;all&#93;(deps): [dependency] Update dependency group
   - Bumps the dependabot-all group with 35 updates:
   - | Package                                                                                                                             | From      | To        |
     | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
@@ -419,6 +442,11 @@ updated-dependencies:
 
 ### 🛡️ Security
 
+- [`ae07a6c`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/ae07a6c8d837ef58df4b824d578f1fe747068a01 "Diff: 15 files, +530 | -180") — 🔒️ [fix] Resolve Sonar findings and harden script linting&nbsp;<sub><em>(15&nbsp;files,&nbsp;+530,&nbsp;-180)</em></sub>
+  - Resolve GitHub CLI through trusted absolute paths, with an explicit absolute GH_PATH override for nonstandard installations.
+  - Replace the changelog regex with a linear tested normalizer, simplify help and argument parsing, and use Sonar-compatible numeric constants.
+  - Bring repository maintenance scripts under zero-warning linting while preserving the SEA build, dependency refresh, and Node-version synchronization behavior.
+
 - [`c3c1620`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/c3c162005f25959e19f92edde293da25b8e7bd22 "Diff: 6 files, +19920 | -14540") — _(deps)_ [dependency] Update dependency group&nbsp;<sub><em>(6&nbsp;files,&nbsp;+19920,&nbsp;-14540)</em></sub>
   - Bumps the dependabot-all group with 6 updates:
   - | Package                                                                       | From     | To       |
@@ -451,7 +479,7 @@ updated-dependencies:
 - [Release notes](https://github.com/softprops/action-gh-release/releases)
 - [Changelog](https://github.com/softprops/action-gh-release/blob/master/CHANGELOG.md)
 - [Commits](https://github.com/softprops/action-gh-release/compare/718ea10b132b3b2eba29c1007bb80653f286566b...3d0d9888cb7fd7b750713d6e236d1fcb99157228)
-  \[dependabot\]\[dev\]\[all\](deps-dev): [dependency] Update dependency group
+  &#91;dependabot&#93;&#91;dev&#93;&#91;all&#93;(deps-dev): [dependency] Update dependency group
   - Bumps the dependabot-all group with 13 updates:
   - | Package                                                                                                          | From      | To        |
     | ---------------------------------------------------------------------------------------------------------------- | --------- | --------- |
@@ -947,7 +975,7 @@ updated-dependencies:
   - Updates `undici-types` from 7.19.2 to 7.24.6
 - [Release notes](https://github.com/nodejs/undici/releases)
 - [Commits](https://github.com/nodejs/undici/compare/v7.19.2...v7.24.6)
-  \[dependabot\]\[all\](deps): [dependency] Update dependency group
+  &#91;dependabot&#93;&#91;all&#93;(deps): [dependency] Update dependency group
   - Bumps the dependabot-all group with 4 updates: [step-security/harden-runner](https://github.com/step-security/harden-runner), [github/codeql-action](https://github.com/github/codeql-action), [actions/dependency-review-action](https://github.com/actions/dependency-review-action) and [gitleaks/gitleaks-action](https://github.com/gitleaks/gitleaks-action).
   - Updates `step-security/harden-runner` from 2.19.0 to 2.19.4
 - [Release notes](https://github.com/step-security/harden-runner/releases)
@@ -1165,7 +1193,7 @@ updated-dependencies:
 - [Release notes](https://github.com/softprops/action-gh-release/releases)
 - [Changelog](https://github.com/softprops/action-gh-release/blob/master/CHANGELOG.md)
 - [Commits](https://github.com/softprops/action-gh-release/compare/3bb12739c298aeb8a4eeaf626c5b8d85266b0e65...b4309332981a82ec1c5618f44dd2e27cc8bfbfda)
-  \[dependabot\]\[all\](deps): [dependency] Update dependency group
+  &#91;dependabot&#93;&#91;all&#93;(deps): [dependency] Update dependency group
   - Bumps the dependabot-all group with 19 updates:
   - | Package                                                                                                                             | From     | To       |
     | ----------------------------------------------------------------------------------------------------------------------------------- | -------- | -------- |
