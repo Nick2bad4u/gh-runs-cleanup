@@ -35,8 +35,9 @@ electron-app/package-lock.json
 # Ignore Sonar properties (not compatible with prettier-ini parser)
 sonar-project.properties
 
-# covered by remark lint / remark
+# TOML files are formatted and checked by Tombi through ESLint
 .gitleaks.toml
+tombi.toml
 .taplo.toml
 cliff.toml
 lychee.toml

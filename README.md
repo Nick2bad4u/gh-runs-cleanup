@@ -17,7 +17,7 @@ Project site: <https://nick2bad4u.github.io/gh-runs-cleanup/>
 ## Requirements
 
 - `gh` CLI installed and authenticated
-- Node.js `>=22.18.0`
+- Node.js `^22.18.0 || ^24.0.0 || >=26.0.0`
 
 Extension installs run directly from the repository source; no local build step is required for end users.
 

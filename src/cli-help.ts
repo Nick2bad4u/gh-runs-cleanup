@@ -1,15 +1,15 @@
-import type { Styler } from "./cli-types.js";
+import type { Styler } from "./cli-types.ts";
 
-type HelpOption = {
+interface HelpOption {
     arg?: string;
     description: string;
     flag: string;
-};
+}
 
-type HelpSection = {
+interface HelpSection {
     options?: HelpOption[];
     title: string;
-};
+}
 
 const HELP_SECTIONS: HelpSection[] = [
     {
@@ -222,59 +222,54 @@ const HELP_EXAMPLES = [
     "gh runs-cleanup --before-days 30 --status failure --confirm",
 ];
 
-function styleToken(token: string, styler: Styler): string {
-    if (token.startsWith("--")) return styler.flag(token);
-    if (token.startsWith("<") && token.endsWith(">")) return styler.arg(token);
-    return token;
-}
-
-function styleCommandExample(command: string, styler?: Styler): string {
-    if (!styler) {
-        return command;
-    }
-
-    return command
-        .split(/(\s+)/u)
-        .map((token) => styleToken(token, styler))
-        .join("");
-}
-
+/** Build the complete CLI help text, optionally with terminal styling. */
 export function buildHelpText(styler?: Styler): string {
     const heading = (text: string): string =>
-        styler ? styler.info(text) : text;
-    const flag = (text: string): string => (styler ? styler.flag(text) : text);
-    const arg = (text: string): string => (styler ? styler.arg(text) : text);
+        styler === undefined ? text : styler.info(text);
+    const flag = (text: string): string =>
+        styler === undefined ? text : styler.flag(text);
+    const arg = (text: string): string =>
+        styler === undefined ? text : styler.arg(text);
     const title = (text: string): string =>
-        styler ? styler.heading(text) : text;
+        styler === undefined ? text : styler.heading(text);
 
     const optionLabelWidths = HELP_SECTIONS.flatMap((section) =>
         (section.options ?? []).map((option) => {
-            const argSuffix = option.arg ? ` ${option.arg}` : "";
+            const argSuffix =
+                typeof option.arg === "string" && option.arg.length > 0
+                    ? ` ${option.arg}`
+                    : "";
             return `${option.flag}${argSuffix}`.length;
         })
     );
     const maxLabelWidth = Math.max(...optionLabelWidths, 0);
 
-    const lines: string[] = [];
-    lines.push(
+    const lines: string[] = [
         title("gh-runs-cleanup"),
         "",
         "  Delete GitHub Actions workflow runs using the gh CLI.",
         "",
         heading("  Usage:"),
         `    ${styleCommandExample("gh runs-cleanup", styler)} ${arg("[options]")}`,
-        ""
-    );
+        "",
+    ];
 
     for (const section of HELP_SECTIONS) {
         lines.push(heading(`  ${section.title}:`));
-        for (const option of section.options ?? []) {
-            const plainArgPart = option.arg ? ` ${option.arg}` : "";
-            const styledArgPart = option.arg ? ` ${arg(option.arg)}` : "";
-            const labelPlain = `${option.flag}${plainArgPart}`;
-            const labelStyled = `${flag(option.flag)}${styledArgPart}`;
-            const spacing = " ".repeat(maxLabelWidth - labelPlain.length + 2);
-            lines.push(`    ${labelStyled}${spacing}${option.description}`);
+        if (section.options !== undefined) {
+            for (const option of section.options) {
+                const argument = option.arg;
+                const hasArgument =
+                    typeof argument === "string" && argument.length > 0;
+                const plainArgPart = hasArgument ? ` ${argument}` : "";
+                const styledArgPart = hasArgument ? ` ${arg(argument)}` : "";
+                const labelPlain = `${option.flag}${plainArgPart}`;
+                const labelStyled = `${flag(option.flag)}${styledArgPart}`;
+                const spacing = " ".repeat(
+                    maxLabelWidth - labelPlain.length + 2
+                );
+                lines.push(`    ${labelStyled}${spacing}${option.description}`);
+            }
         }
         lines.push("");
     }
@@ -292,10 +287,29 @@ export function buildHelpText(styler?: Styler): string {
     return lines.join("\n");
 }
 
+/** Return unstyled CLI help text. */
 export function printHelp(): string {
     return buildHelpText();
 }
 
+/** Render CLI help text using the supplied terminal styler. */
 export function renderHelpText(styler: Styler): string {
     return buildHelpText(styler);
+}
+
+function styleCommandExample(command: string, styler?: Styler): string {
+    if (styler === undefined) {
+        return command;
+    }
+
+    return command
+        .split(/(?<spacing>\s+)/v)
+        .map((token) => styleToken(token, styler))
+        .join("");
+}
+
+function styleToken(token: string, styler: Styler): string {
+    if (token.startsWith("--")) return styler.flag(token);
+    if (token.startsWith("<") && token.endsWith(">")) return styler.arg(token);
+    return token;
 }

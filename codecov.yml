@@ -1,0 +1,24 @@
+comment:
+    behavior: "default"
+    layout: "reach,diff,flags,tree"
+    require_changes: true
+
+coverage:
+    precision: 2
+    range: "90...100"
+    round: "down"
+    status:
+        patch:
+            default:
+                target: "90%"
+                threshold: "1%"
+
+        project:
+            default:
+                target: "90%"
+                threshold: "1%"
+flags:
+    unit:
+        carryforward: false
+        paths:
+            - "src/"

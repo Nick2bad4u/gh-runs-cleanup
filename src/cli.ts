@@ -1,8 +1,3 @@
-#!/usr/bin/env node
-
-import { fileURLToPath } from "node:url";
-
-import { printHelp, renderHelpText } from "./cli-help.js";
 import {
     deleteRunWithRetry,
     listReposForOwner,
@@ -10,7 +5,8 @@ import {
     resolveAuthenticatedLogin,
     resolveRepo,
     runGh,
-} from "./cli-gh.js";
+} from "./cli-gh.ts";
+import { printHelp, renderHelpText } from "./cli-help.ts";
 import {
     getCreatedAtEpoch,
     printDryRunWorkflowSummary,
@@ -18,97 +14,473 @@ import {
     printTextSummary,
     printVerboseRuns,
     sortRuns,
-} from "./cli-output.js";
+} from "./cli-output.ts";
 import {
     createProgressBar,
     createStyler,
     shouldShowProgress,
     shouldUseColor,
     shouldUseUnicode,
-} from "./cli-styling.js";
+} from "./cli-styling.ts";
 import {
     type ColorMode,
     type ErrorCategory,
     type ParsedOptions,
     type RunSummary,
     type Styler,
-    type WorkflowRun,
     VALID_STATUSES,
-} from "./cli-types.js";
+    type WorkflowRun,
+} from "./cli-types.ts";
 
-function parseArguments(args: string[]): ParsedOptions {
-    const parsed: ParsedOptions = {};
+const BOOLEAN_OPTIONS: ReadonlySet<string> = new Set([
+    "all-repos",
+    "all-statuses",
+    "ci",
+    "confirm",
+    "dry-run",
+    "fail-fast",
+    "help",
+    "json",
+    "no-color",
+    "no-progress",
+    "no-unicode",
+    "quiet",
+    "summary",
+    "verbose",
+    "yes",
+]);
+const COLOR_MODES = [
+    "always",
+    "auto",
+    "never",
+] as const;
+const ORDERS = [
+    "newest",
+    "none",
+    "oldest",
+] as const;
+const REPEATABLE_OPTIONS: ReadonlySet<string> = new Set([
+    "exclude-branch",
+    "exclude-workflow",
+    "repos",
+    "status",
+]);
+const UNICODE_MODES = [
+    "always",
+    "auto",
+    "never",
+] as const;
 
-    for (let index = 0; index < args.length; index += 1) {
-        const token = args[index];
+interface DeletionOutcome {
+    readonly attempted: number;
+    readonly deleted: number;
+    readonly failedIds: readonly number[];
+}
 
-        if (!token?.startsWith("--")) {
-            continue;
-        }
+interface ExecutionConfig {
+    readonly beforeDays: number | undefined;
+    readonly ciMode: boolean;
+    readonly dryRun: boolean;
+    readonly excludedBranchNames: ReadonlySet<string>;
+    readonly excludedWorkflowNames: ReadonlySet<string>;
+    readonly failFast: boolean;
+    readonly jsonOutput: boolean;
+    readonly limit: number;
+    readonly maxDelete: number | undefined;
+    readonly maxFailures: number | undefined;
+    readonly maxRetries: number;
+    readonly noProgress: boolean;
+    readonly options: Readonly<ParsedOptions>;
+    readonly order: Order;
+    readonly quiet: boolean;
+    readonly retryDelayMs: number;
+    readonly statuses: readonly string[];
+    readonly styler: Styler;
+    readonly summaryMode: boolean;
+    readonly targetRepos: readonly string[];
+    readonly useUnicodeTables: boolean;
+    readonly verbose: boolean;
+}
 
-        const [rawKey, inlineValue] = token.slice(2).split("=", 2);
-        const key = (rawKey ?? "").trim();
+interface ExitResult {
+    readonly exitCode: number;
+    readonly ok: false;
+}
 
-        if (
-            key === "dry-run" ||
-            key === "confirm" ||
-            key === "yes" ||
-            key === "verbose" ||
-            key === "quiet" ||
-            key === "all-statuses" ||
-            key === "fail-fast" ||
-            key === "help" ||
-            key === "json" ||
-            key === "summary" ||
-            key === "no-color" ||
-            key === "no-unicode" ||
-            key === "no-progress" ||
-            key === "ci" ||
-            key === "all-repos"
-        ) {
-            parsed[key] = true;
-            continue;
-        }
+interface NumericConfig {
+    readonly beforeDays: number | undefined;
+    readonly limit: number;
+    readonly maxDelete: number | undefined;
+    readonly maxFailures: number | undefined;
+    readonly maxRetries: number;
+    readonly retryDelayMs: number;
+}
 
-        const nextToken = args[index + 1];
-        const value =
-            inlineValue ??
-            (nextToken && !nextToken.startsWith("--") ? nextToken : "");
+type Order = (typeof ORDERS)[number];
 
-        if (
-            inlineValue === undefined &&
-            nextToken &&
-            !nextToken.startsWith("--")
-        ) {
-            index += 1;
-        }
+interface ParsedArgument {
+    readonly consumesNextToken: boolean;
+    readonly key: string;
+    readonly value: boolean | string;
+}
 
-        if (
-            key === "status" ||
-            key === "exclude-workflow" ||
-            key === "exclude-branch" ||
-            key === "repos"
-        ) {
-            const existing = parsed[key];
-            const bucket = Array.isArray(existing) ? existing : [];
-            bucket.push(value);
-            parsed[key] = bucket;
-            continue;
-        }
+type ProcessRepositoryParams = Omit<ExecutionConfig, "targetRepos"> & {
+    readonly repoIndex: number;
+    readonly repoTotal: number;
+    readonly resolvedRepo: string;
+};
 
-        parsed[key] = value;
+interface RunSelection {
+    readonly candidates: readonly WorkflowRun[];
+    readonly deduplicatedCount: number;
+    readonly matchedRuns: readonly WorkflowRun[];
+    readonly skippedByAge: number;
+    readonly skippedByExclusion: number;
+}
+
+type StepResult<T> = ExitResult | SuccessResult<T>;
+
+interface SuccessResult<T> {
+    readonly ok: true;
+    readonly value: T;
+}
+
+/** Execute the workflow-run cleanup command and return a process exit code. */
+export function main(argv: readonly string[]): number {
+    const startedAt = Date.now();
+    const options = parseArguments(argv);
+    const built = buildExecutionConfig(options);
+    if (!built.ok) {
+        return built.exitCode;
     }
 
-    return parsed;
+    const config = built.value;
+    const {
+        beforeDays,
+        ciMode,
+        dryRun,
+        excludedBranchNames,
+        excludedWorkflowNames,
+        failFast,
+        jsonOutput,
+        limit,
+        maxDelete,
+        maxFailures,
+        maxRetries,
+        noProgress,
+        options: normalizedOptions,
+        order,
+        quiet,
+        retryDelayMs,
+        statuses,
+        styler,
+        summaryMode,
+        targetRepos,
+        useUnicodeTables,
+        verbose,
+    } = config;
+
+    const repoSummaries: RunSummary[] = [];
+
+    for (const [repoIndex, resolvedRepo] of targetRepos.entries()) {
+        const result = processRepository({
+            beforeDays,
+            ciMode,
+            dryRun,
+            excludedBranchNames,
+            excludedWorkflowNames,
+            failFast,
+            jsonOutput,
+            limit,
+            maxDelete,
+            maxFailures,
+            maxRetries,
+            noProgress,
+            options: normalizedOptions,
+            order,
+            quiet,
+            repoIndex,
+            repoTotal: targetRepos.length,
+            resolvedRepo,
+            retryDelayMs,
+            statuses,
+            styler,
+            summaryMode,
+            useUnicodeTables,
+            verbose,
+        });
+
+        if (!result.ok) {
+            return result.exitCode;
+        }
+
+        repoSummaries.push(result.value);
+    }
+
+    if (jsonOutput) {
+        printJsonSummaries(repoSummaries, dryRun, startedAt);
+    }
+
+    const hasFailures = repoSummaries.some((summary) => summary.failed > 0);
+    return hasFailures ? 2 : 0;
+}
+
+function assignParsedArgument(
+    parsed: Readonly<ParsedOptions>,
+    argument: ParsedArgument
+): ParsedOptions {
+    if (
+        typeof argument.value === "boolean" ||
+        !REPEATABLE_OPTIONS.has(argument.key)
+    ) {
+        return { ...parsed, [argument.key]: argument.value };
+    }
+
+    const existing = parsed[argument.key];
+    const bucket = isStringArray(existing) ? [...existing] : [];
+    bucket.push(argument.value);
+    return { ...parsed, [argument.key]: bucket };
+}
+
+function buildExecutionConfig(
+    options: Readonly<ParsedOptions>
+): StepResult<ExecutionConfig> {
+    const isJsonOutput = options["json"] === true;
+    const isCiMode = options["ci"] === true;
+    const isNoProgress = options["no-progress"] === true;
+    const colorOption = resolveDisplayMode(
+        options,
+        "color",
+        isCiMode || options["no-color"] === true ? "never" : undefined
+    );
+    const colorMode: ColorMode = isAllowedValue(colorOption, COLOR_MODES)
+        ? colorOption
+        : "auto";
+    const styler = createStyler(shouldUseColor(colorMode, isJsonOutput));
+
+    if (options["help"] === true) {
+        console.log(renderHelpText(styler));
+        return { exitCode: 0, ok: false };
+    }
+
+    if (!isAllowedValue(colorOption, COLOR_MODES)) {
+        return createErrorResult(
+            "--color must be one of: auto, always, never.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    const isDryRun = options["dry-run"] === true;
+    const isConfirm = options["confirm"] === true || options["yes"] === true;
+    const isVerbose = options["verbose"] === true;
+    const isSummaryMode = options["summary"] === true;
+    const isQuiet = options["quiet"] === true;
+    const isFailFast = options["fail-fast"] === true;
+
+    const unicodeOption = resolveDisplayMode(
+        options,
+        "unicode",
+        isCiMode || options["no-unicode"] === true ? "never" : undefined
+    );
+    if (!isAllowedValue(unicodeOption, UNICODE_MODES)) {
+        return createErrorResult(
+            "--unicode must be one of: auto, always, never.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    const useUnicodeTables = shouldUseUnicode(unicodeOption, isJsonOutput);
+
+    if (!isDryRun && !isConfirm) {
+        return createErrorResult(
+            "Safety stop: pass --confirm to perform deletion, or use --dry-run to preview.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    const excludedWorkflowNames = new Set(
+        collectStringListOption(options, "exclude-workflow").map((value) =>
+            value.toLowerCase()
+        )
+    );
+    const excludedBranchNames = new Set(
+        collectStringListOption(options, "exclude-branch").map((value) =>
+            value.toLowerCase()
+        )
+    );
+
+    const statusesResult = parseStatuses(options, isJsonOutput, styler);
+    if (!statusesResult.ok) {
+        return statusesResult;
+    }
+
+    const numericResult = parseNumericConfig(options, isJsonOutput, styler);
+    if (!numericResult.ok) {
+        return numericResult;
+    }
+
+    const orderOption = readNormalizedString(options["order"]) ?? "oldest";
+    if (!isAllowedValue(orderOption, ORDERS)) {
+        return createErrorResult(
+            "--order must be one of: oldest, newest, none.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    const targetReposResult = resolveTargetRepos(options, isJsonOutput, styler);
+    if (!targetReposResult.ok) {
+        return targetReposResult;
+    }
+
+    const numericConfig = numericResult.value;
+    const normalizedOptions: ParsedOptions = {
+        ...options,
+        limit: String(numericConfig.limit),
+    };
+
+    return succeed({
+        beforeDays: numericConfig.beforeDays,
+        ciMode: isCiMode,
+        dryRun: isDryRun,
+        excludedBranchNames,
+        excludedWorkflowNames,
+        failFast: isFailFast,
+        jsonOutput: isJsonOutput,
+        limit: numericConfig.limit,
+        maxDelete: numericConfig.maxDelete,
+        maxFailures: numericConfig.maxFailures,
+        maxRetries: numericConfig.maxRetries,
+        noProgress: isNoProgress,
+        options: normalizedOptions,
+        order: orderOption,
+        quiet: isQuiet,
+        retryDelayMs: numericConfig.retryDelayMs,
+        statuses: statusesResult.value,
+        styler,
+        summaryMode: isSummaryMode,
+        targetRepos: targetReposResult.value,
+        useUnicodeTables,
+        verbose: isVerbose,
+    });
+}
+
+function collectStringListOption(
+    options: Readonly<ParsedOptions>,
+    key: string
+): string[] {
+    const rawValues = options[key];
+    if (isStringArray(rawValues)) {
+        return rawValues
+            .flatMap((value) => value.split(","))
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+    }
+
+    if (typeof rawValues === "string") {
+        return rawValues
+            .split(",")
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+    }
+
+    return [];
+}
+
+function collectStringValues(
+    rawValue: ParsedOptions[string] | undefined,
+    defaultValue: string
+): readonly string[] {
+    if (isStringArray(rawValue)) {
+        return rawValue;
+    }
+
+    return typeof rawValue === "string" ? [rawValue] : [defaultValue];
+}
+
+function createErrorResult(
+    message: string,
+    category: ErrorCategory,
+    isJsonOutput: boolean,
+    styler?: Styler
+): ExitResult {
+    return {
+        exitCode: emitError(message, category, isJsonOutput, styler),
+        ok: false,
+    };
+}
+
+function deleteCandidates(
+    candidates: readonly WorkflowRun[],
+    params: ProcessRepositoryParams,
+    showProgress: boolean
+): DeletionOutcome {
+    const failedIds: number[] = [];
+    const state = { attempted: 0, deleted: 0 };
+    if (params.dryRun) {
+        return { ...state, failedIds };
+    }
+
+    const deletionProgress = createProgressBar(
+        "Deleting runs",
+        candidates.length,
+        params.styler,
+        showProgress
+    );
+    for (const run of candidates) {
+        state.attempted += 1;
+        const result = deleteRunWithRetry(
+            params.resolvedRepo,
+            run.databaseId,
+            params.maxRetries,
+            params.retryDelayMs,
+            (attemptNumber, totalAttempts) => {
+                deletionProgress.update(
+                    state.attempted - 1,
+                    `id=${run.databaseId} a=${attemptNumber}/${totalAttempts} d=${state.deleted} f=${failedIds.length}`
+                );
+            }
+        );
+
+        if (result.ok) {
+            state.deleted += 1;
+        } else {
+            failedIds.push(run.databaseId);
+            reportDeletionFailure(run.databaseId, result, params);
+        }
+
+        deletionProgress.update(
+            state.attempted,
+            `d=${state.deleted} f=${failedIds.length}`
+        );
+        const hasReachedFailureLimit =
+            !result.ok &&
+            (params.failFast ||
+                (params.maxFailures !== undefined &&
+                    failedIds.length >= params.maxFailures));
+        if (hasReachedFailureLimit) {
+            break;
+        }
+    }
+    deletionProgress.done();
+
+    return { ...state, failedIds };
 }
 
 function emitError(
     message: string,
     category: ErrorCategory,
-    asJson: boolean,
+    isJsonOutput: boolean,
     styler?: Styler
 ): number {
-    if (asJson) {
+    if (isJsonOutput) {
         console.error(
             JSON.stringify(
                 {
@@ -131,319 +503,294 @@ function emitError(
     return 1;
 }
 
-function isValidRepoSlug(value: string): boolean {
-    return /^[^\s/]+\/[^\s/]+$/u.test(value);
-}
-
-function collectStringListOption(
-    options: ParsedOptions,
-    key: string
-): string[] {
-    const rawValues = options[key];
-    if (Array.isArray(rawValues)) {
-        return rawValues
-            .flatMap((value) => value.split(","))
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0);
-    }
-
-    if (typeof rawValues === "string") {
-        return rawValues
-            .split(",")
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0);
-    }
-
-    return [];
-}
-
-type ProcessRepositoryParams = {
-    beforeDays: number | undefined;
-    ciMode: boolean;
-    dryRun: boolean;
-    excludedBranchNames: Set<string>;
-    excludedWorkflowNames: Set<string>;
-    failFast: boolean;
-    jsonOutput: boolean;
-    limit: number;
-    maxDelete: number | undefined;
-    maxFailures: number | undefined;
-    maxRetries: number;
-    noProgress: boolean;
-    order:
-        | "oldest"
-        | "newest"
-        | "none";
-    options: ParsedOptions;
-    quiet: boolean;
-    repoIndex: number;
-    repoTotal: number;
-    resolvedRepo: string;
-    retryDelayMs: number;
-    statuses: string[];
-    styler: Styler;
-    summaryMode: boolean;
-    unicodeTables: boolean;
-    verbose: boolean;
-};
-
-function processRepository(
-    params: ProcessRepositoryParams
-): RunSummary | number {
-    const {
-        beforeDays,
-        ciMode,
-        dryRun,
-        excludedBranchNames,
-        excludedWorkflowNames,
-        failFast,
-        jsonOutput,
-        limit,
-        maxDelete,
-        maxFailures,
-        maxRetries,
-        noProgress,
-        options,
-        order,
-        quiet,
-        repoIndex,
-        repoTotal,
-        resolvedRepo,
-        retryDelayMs,
-        statuses,
-        styler,
-        summaryMode,
-        unicodeTables,
-        verbose,
-    } = params;
-
-    if (!jsonOutput && !quiet && repoTotal > 1) {
-        if (repoIndex > 0) {
-            console.log("");
-        }
-        console.log(
-            styler.heading(
-                `Repository ${repoIndex + 1}/${repoTotal}: ${resolvedRepo}`
-            )
-        );
-    }
-
-    const repoStartedAt = Date.now();
+function fetchWorkflowRuns(
+    params: ProcessRepositoryParams,
+    showProgress: boolean
+): StepResult<readonly WorkflowRun[]> {
     const allRuns: WorkflowRun[] = [];
-    const expectedFetchTotal = Math.max(1, statuses.length * limit);
-    const showProgress = shouldShowProgress(
-        jsonOutput,
-        quiet,
-        verbose,
-        noProgress,
-        ciMode
-    );
     const fetchProgress = createProgressBar(
         "Fetching runs",
-        expectedFetchTotal,
-        styler,
+        Math.max(1, params.statuses.length * params.limit),
+        params.styler,
         showProgress
     );
 
     try {
-        for (const [index, status] of statuses.entries()) {
+        for (const [index, status] of params.statuses.entries()) {
             const beforeCount = allRuns.length;
             const runs = listRuns(
-                resolvedRepo,
+                params.resolvedRepo,
                 status,
-                options,
+                params.options,
                 (fetchedInStatus, detail) => {
                     fetchProgress.update(
                         beforeCount + fetchedInStatus,
-                        `s=${index + 1}/${statuses.length} ${status} ${detail} runs=${beforeCount + fetchedInStatus}`
+                        `s=${index + 1}/${params.statuses.length} ${status} ${detail} runs=${beforeCount + fetchedInStatus}`
                     );
                 }
             );
-
             allRuns.push(...runs);
             fetchProgress.update(
                 allRuns.length,
-                `s=${index + 1}/${statuses.length} ${status} done runs=${allRuns.length}`
+                `s=${index + 1}/${params.statuses.length} ${status} done runs=${allRuns.length}`
             );
         }
         fetchProgress.done();
+        return succeed(allRuns);
     } catch (error) {
         fetchProgress.done();
         const message = error instanceof Error ? error.message : String(error);
-        return emitError(
-            `failed to list runs for ${resolvedRepo}: ${message}`,
+        return createErrorResult(
+            `failed to list runs for ${params.resolvedRepo}: ${message}`,
             "gh_cli_error",
-            jsonOutput,
+            params.jsonOutput,
+            params.styler
+        );
+    }
+}
+
+function invalidReposResult(
+    invalidRepos: readonly string[],
+    isJsonOutput: boolean,
+    styler: Styler
+): ExitResult {
+    return createErrorResult(
+        `invalid repository values: ${invalidRepos.join(", ")}. Use owner/name format.`,
+        "validation_error",
+        isJsonOutput,
+        styler
+    );
+}
+
+function isAllowedValue<T extends string>(
+    value: string,
+    allowedValues: readonly T[]
+): value is T {
+    for (const allowedValue of allowedValues) {
+        if (allowedValue === value) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+    return (
+        Array.isArray(value) &&
+        value.every((item: unknown) => typeof item === "string")
+    );
+}
+
+function isValidRepoSlug(value: string): boolean {
+    return /^[^\s\/]+\/[^\s\/]+$/v.test(value);
+}
+
+function parseArgument(
+    token: string,
+    nextToken: string | undefined
+): ParsedArgument {
+    const optionText = token.slice(2);
+    const separatorIndex = optionText.indexOf("=");
+    const hasInlineValue = separatorIndex !== -1;
+    const key = (
+        hasInlineValue ? optionText.slice(0, separatorIndex) : optionText
+    ).trim();
+    if (BOOLEAN_OPTIONS.has(key)) {
+        return { consumesNextToken: false, key, value: true };
+    }
+
+    const hasSeparateValue =
+        nextToken !== undefined && !nextToken.startsWith("--");
+    const value = hasInlineValue
+        ? optionText.slice(separatorIndex + 1)
+        : hasSeparateValue
+          ? nextToken
+          : "";
+    return {
+        consumesNextToken: !hasInlineValue && hasSeparateValue,
+        key,
+        value,
+    };
+}
+
+function parseArguments(args: readonly string[]): ParsedOptions {
+    let parsed: ParsedOptions = {};
+
+    for (let index = 0; index < args.length; index += 1) {
+        const token = args[index];
+        if (token?.startsWith("--") === true) {
+            const argument = parseArgument(token, args[index + 1]);
+            parsed = assignParsedArgument(parsed, argument);
+            index += argument.consumesNextToken ? 1 : 0;
+        }
+    }
+
+    return parsed;
+}
+
+function parseIntegerValue(
+    rawValue: ParsedOptions[string] | undefined,
+    defaultValue: number | undefined,
+    minimum: number
+):
+    | null
+    | number
+    | undefined {
+    if (rawValue === undefined) {
+        return defaultValue;
+    }
+
+    if (typeof rawValue !== "string" || rawValue.trim().length === 0) {
+        return null;
+    }
+
+    const value = Number(rawValue);
+    return Number.isSafeInteger(value) && value >= minimum ? value : null;
+}
+
+function parseNumericConfig(
+    options: Readonly<ParsedOptions>,
+    isJsonOutput: boolean,
+    styler: Styler
+): StepResult<NumericConfig> {
+    const limit = parseIntegerValue(options["limit"], 500, 1);
+    if (typeof limit !== "number") {
+        return createErrorResult(
+            "--limit must be a positive integer.",
+            "validation_error",
+            isJsonOutput,
             styler
         );
     }
 
-    const uniqueById = new Map<number, WorkflowRun>();
-    for (const run of allRuns) {
-        uniqueById.set(run.databaseId, run);
-    }
-
-    const dedupedRuns = Array.from(uniqueById.values());
-    const orderedRuns = sortRuns(dedupedRuns, order);
-
-    let skippedByExclusion = 0;
-    const includedRuns = orderedRuns.filter((run) => {
-        const workflowName = run.workflowName?.toLowerCase();
-        const branchName = run.headBranch?.toLowerCase();
-
-        const excludedByWorkflow =
-            typeof workflowName === "string" &&
-            excludedWorkflowNames.has(workflowName);
-        const excludedByBranch =
-            typeof branchName === "string" &&
-            excludedBranchNames.has(branchName);
-
-        if (excludedByWorkflow || excludedByBranch) {
-            skippedByExclusion += 1;
-            return false;
-        }
-
-        return true;
-    });
-
-    let skippedByAge = 0;
-    const now = Date.now();
-    const ageCutoffEpoch =
-        typeof beforeDays === "number"
-            ? now - beforeDays * 24 * 60 * 60 * 1000
-            : undefined;
-    const runsToProcess =
-        typeof ageCutoffEpoch === "number"
-            ? includedRuns.filter((run) => {
-                  const createdEpoch = getCreatedAtEpoch(run);
-                  const include = Number.isFinite(createdEpoch)
-                      ? createdEpoch <= ageCutoffEpoch
-                      : true;
-                  if (!include) {
-                      skippedByAge += 1;
-                  }
-                  return include;
-              })
-            : includedRuns;
-
-    const candidates =
-        Number.isFinite(maxDelete) && maxDelete !== undefined
-            ? runsToProcess.slice(0, maxDelete)
-            : runsToProcess;
-
-    if (verbose && !jsonOutput && !quiet) {
-        printVerboseRuns(candidates, styler, unicodeTables);
-    }
-
-    let deleted = 0;
-    const failedIds: number[] = [];
-    let attempted = 0;
-
-    if (!jsonOutput && !quiet) {
-        console.log(
-            styler.info(
-                `Planned deletions: ${candidates.length} (from ${allRuns.length} fetched runs, ${dedupedRuns.length} unique).`
-            )
+    const maxDelete = parseIntegerValue(options["max-delete"], undefined, 1);
+    if (maxDelete === null) {
+        return createErrorResult(
+            "--max-delete must be a positive integer.",
+            "validation_error",
+            isJsonOutput,
+            styler
         );
     }
 
-    const deleteProgress = createProgressBar(
-        "Deleting runs",
-        candidates.length,
-        styler,
-        showProgress && !dryRun
+    const beforeDays = parseIntegerValue(options["before-days"], undefined, 0);
+    if (beforeDays === null) {
+        return createErrorResult(
+            "--before-days must be a non-negative integer.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    const maxRetries = parseIntegerValue(options["max-retries"], 2, 0);
+    if (typeof maxRetries !== "number") {
+        return createErrorResult(
+            "--max-retries must be a non-negative integer.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    const retryDelayMs = parseIntegerValue(options["retry-delay-ms"], 200, 0);
+    if (typeof retryDelayMs !== "number") {
+        return createErrorResult(
+            "--retry-delay-ms must be a non-negative integer.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    const maxFailures = parseIntegerValue(
+        options["max-failures"],
+        undefined,
+        1
     );
-
-    if (!dryRun) {
-        for (const run of candidates) {
-            attempted += 1;
-
-            const result = deleteRunWithRetry(
-                resolvedRepo,
-                run.databaseId,
-                maxRetries,
-                retryDelayMs,
-                (attemptNumber, totalAttempts) => {
-                    deleteProgress.update(
-                        attempted - 1,
-                        `id=${run.databaseId} a=${attemptNumber}/${totalAttempts} d=${deleted} f=${failedIds.length}`
-                    );
-                }
-            );
-
-            if (result.ok) {
-                deleted += 1;
-            } else {
-                failedIds.push(run.databaseId);
-                if (verbose && !jsonOutput) {
-                    console.error(
-                        `Delete failed for run ${run.databaseId} after ${result.attempts} attempt(s): ${result.error ?? "unknown"}`
-                    );
-                }
-
-                if (failFast) {
-                    break;
-                }
-
-                if (
-                    typeof maxFailures === "number" &&
-                    failedIds.length >= maxFailures
-                ) {
-                    break;
-                }
-            }
-
-            deleteProgress.update(
-                attempted,
-                `d=${deleted} f=${failedIds.length}`
-            );
-        }
-
-        deleteProgress.done();
+    if (maxFailures === null) {
+        return createErrorResult(
+            "--max-failures must be a positive integer.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
     }
 
-    const summary: RunSummary = {
-        attempted,
-        deleted,
-        dryRun,
-        durationMs: Date.now() - repoStartedAt,
-        failed: failedIds.length,
-        failedIds,
-        matched: runsToProcess.length,
-        planned: candidates.length,
-        repo: resolvedRepo,
-        skippedByExclusion,
-        statuses,
-        skippedByAge,
-    };
+    return succeed({
+        beforeDays,
+        limit,
+        maxDelete,
+        maxFailures,
+        maxRetries,
+        retryDelayMs,
+    });
+}
 
-    if (!jsonOutput) {
-        if (!quiet) {
-            printTextSummary(summary, styler, unicodeTables);
-            if (dryRun) {
-                printDryRunWorkflowSummary(candidates, styler, unicodeTables);
-            }
-            if (summaryMode) {
-                printSummaryDetails(
-                    runsToProcess,
-                    candidates,
-                    styler,
-                    unicodeTables
-                );
-            }
-        }
+function parseStatuses(
+    options: Readonly<ParsedOptions>,
+    isJsonOutput: boolean,
+    styler: Styler
+): StepResult<readonly string[]> {
+    const rawStatusValues =
+        options["all-statuses"] === true
+            ? [[...VALID_STATUSES].join(",")]
+            : collectStringValues(options["status"], "failure,cancelled");
+    const statuses = rawStatusValues
+        .flatMap((part) => part.split(","))
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
 
-        if (dryRun && !quiet) {
-            console.log(styler.ok("Dry run complete: no deletions performed."));
-        }
+    if (statuses.length === 0) {
+        return createErrorResult(
+            "at least one --status value is required.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
     }
 
-    return summary;
+    const invalidStatuses = statuses.filter(
+        (status) => !VALID_STATUSES.has(status)
+    );
+    if (invalidStatuses.length > 0) {
+        return createErrorResult(
+            `invalid statuses: ${invalidStatuses.join(", ")}. Valid values: ${[...VALID_STATUSES].join(", ")}`,
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
+
+    return succeed(statuses);
+}
+
+function printDeletionPlan(
+    fetchedCount: number,
+    selection: RunSelection,
+    params: ProcessRepositoryParams
+): void {
+    if (params.verbose && !params.jsonOutput && !params.quiet) {
+        printVerboseRuns(
+            selection.candidates,
+            params.styler,
+            params.useUnicodeTables
+        );
+    }
+
+    if (!params.jsonOutput && !params.quiet) {
+        console.log(
+            params.styler.info(
+                `Planned deletions: ${selection.candidates.length} (from ${fetchedCount} fetched runs, ${selection.deduplicatedCount} unique).`
+            )
+        );
+    }
 }
 
 function printJsonSummaries(
-    repoSummaries: RunSummary[],
-    dryRun: boolean,
+    repoSummaries: readonly RunSummary[],
+    isDryRun: boolean,
     startedAt: number
 ): void {
     if (repoSummaries.length === 1) {
@@ -460,7 +807,7 @@ function printJsonSummaries(
             (accumulator, summary) => accumulator + summary.deleted,
             0
         ),
-        dryRun,
+        dryRun: isDryRun,
         durationMs: Date.now() - startedAt,
         failed: repoSummaries.reduce(
             (accumulator, summary) => accumulator + summary.failed,
@@ -489,491 +836,309 @@ function printJsonSummaries(
     );
 }
 
-type ExecutionConfig = {
-    beforeDays: number | undefined;
-    ciMode: boolean;
-    dryRun: boolean;
-    excludedBranchNames: Set<string>;
-    excludedWorkflowNames: Set<string>;
-    failFast: boolean;
-    jsonOutput: boolean;
-    limit: number;
-    maxDelete: number | undefined;
-    maxFailures: number | undefined;
-    maxRetries: number;
-    noProgress: boolean;
-    options: ParsedOptions;
-    order:
-        | "oldest"
-        | "newest"
-        | "none";
-    quiet: boolean;
-    retryDelayMs: number;
-    statuses: string[];
-    styler: Styler;
-    summaryMode: boolean;
-    targetRepos: string[];
-    unicodeTables: boolean;
-    verbose: boolean;
-};
-
-function buildExecutionConfig(
-    options: ParsedOptions
-): ExecutionConfig | number {
-    const jsonOutput = options["json"] === true;
-    const ciMode = options["ci"] === true;
-    const noProgress = options["no-progress"] === true;
-
-    let colorOption = "auto";
-    if (ciMode || options["no-color"] === true) {
-        colorOption = "never";
-    } else if (
-        typeof options["color"] === "string" &&
-        options["color"].length > 0
-    ) {
-        colorOption = options["color"].trim().toLowerCase();
+function printRepositoryHeading(params: ProcessRepositoryParams): void {
+    if (params.jsonOutput || params.quiet || params.repoTotal <= 1) {
+        return;
     }
 
-    const validColorOption =
-        colorOption === "auto" ||
-        colorOption === "always" ||
-        colorOption === "never";
-
-    const colorMode = (validColorOption ? colorOption : "auto") as ColorMode;
-    const styler = createStyler(shouldUseColor(colorMode, jsonOutput));
-
-    if (options["help"] === true) {
-        console.log(renderHelpText(styler));
-        return 0;
+    if (params.repoIndex > 0) {
+        console.log("");
     }
-
-    if (!validColorOption) {
-        return emitError(
-            "--color must be one of: auto, always, never.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const dryRun = options["dry-run"] === true;
-    const confirm = options["confirm"] === true || options["yes"] === true;
-    const verbose = options["verbose"] === true;
-    const summaryMode = options["summary"] === true;
-    const quiet = options["quiet"] === true;
-    const failFast = options["fail-fast"] === true;
-
-    let unicodeOption = "auto";
-    if (ciMode || options["no-unicode"] === true) {
-        unicodeOption = "never";
-    } else if (
-        typeof options["unicode"] === "string" &&
-        options["unicode"].length > 0
-    ) {
-        unicodeOption = options["unicode"].trim().toLowerCase();
-    }
-
-    if (
-        unicodeOption !== "auto" &&
-        unicodeOption !== "always" &&
-        unicodeOption !== "never"
-    ) {
-        return emitError(
-            "--unicode must be one of: auto, always, never.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const unicodeTables = shouldUseUnicode(unicodeOption, jsonOutput);
-
-    if (!dryRun && !confirm) {
-        return emitError(
-            "Safety stop: pass --confirm to perform deletion, or use --dry-run to preview.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const allStatuses = options["all-statuses"] === true;
-
-    const excludedWorkflowNames = new Set(
-        collectStringListOption(options, "exclude-workflow").map((value) =>
-            value.toLowerCase()
+    console.log(
+        params.styler.heading(
+            `Repository ${params.repoIndex + 1}/${params.repoTotal}: ${params.resolvedRepo}`
         )
     );
-    const excludedBranchNames = new Set(
-        collectStringListOption(options, "exclude-branch").map((value) =>
-            value.toLowerCase()
-        )
+}
+
+function printRepositorySummary(
+    summary: RunSummary,
+    selection: RunSelection,
+    params: ProcessRepositoryParams
+): void {
+    if (params.jsonOutput || params.quiet) {
+        return;
+    }
+
+    printTextSummary(summary, params.styler, params.useUnicodeTables);
+    if (params.dryRun) {
+        printDryRunWorkflowSummary(
+            selection.candidates,
+            params.styler,
+            params.useUnicodeTables
+        );
+    }
+    if (params.summaryMode) {
+        printSummaryDetails(
+            selection.matchedRuns,
+            selection.candidates,
+            params.styler,
+            params.useUnicodeTables
+        );
+    }
+    if (params.dryRun) {
+        console.log(
+            params.styler.ok("Dry run complete: no deletions performed.")
+        );
+    }
+}
+
+function processRepository(
+    params: ProcessRepositoryParams
+): StepResult<RunSummary> {
+    printRepositoryHeading(params);
+    const repoStartedAt = Date.now();
+    const showProgress = shouldShowProgress(
+        params.jsonOutput,
+        params.quiet,
+        params.verbose,
+        params.noProgress,
+        params.ciMode
     );
-
-    let rawStatusValues: string[];
-    if (allStatuses) {
-        rawStatusValues = [Array.from(VALID_STATUSES).join(",")];
-    } else if (Array.isArray(options["status"])) {
-        rawStatusValues = options["status"];
-    } else if (typeof options["status"] === "string") {
-        rawStatusValues = [options["status"]];
-    } else {
-        rawStatusValues = ["failure,cancelled"];
+    const fetchedRunsResult = fetchWorkflowRuns(params, showProgress);
+    if (!fetchedRunsResult.ok) {
+        return fetchedRunsResult;
     }
 
-    const statuses = rawStatusValues
-        .flatMap((part) => part.split(","))
-        .map((part) => part.trim())
-        .filter(Boolean);
-
-    if (statuses.length === 0) {
-        return emitError(
-            "at least one --status value is required.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const invalidStatuses = statuses.filter(
-        (status) => !VALID_STATUSES.has(status)
+    const allRuns = fetchedRunsResult.value;
+    const selection = selectRuns(allRuns, params);
+    printDeletionPlan(allRuns.length, selection, params);
+    const deletion = deleteCandidates(
+        selection.candidates,
+        params,
+        showProgress
     );
-    if (invalidStatuses.length > 0) {
-        return emitError(
-            `invalid statuses: ${invalidStatuses.join(", ")}. Valid values: ${Array.from(VALID_STATUSES).join(", ")}`,
-            "validation_error",
-            jsonOutput,
-            styler
-        );
+    const summary: RunSummary = {
+        attempted: deletion.attempted,
+        deleted: deletion.deleted,
+        dryRun: params.dryRun,
+        durationMs: Date.now() - repoStartedAt,
+        failed: deletion.failedIds.length,
+        failedIds: deletion.failedIds,
+        matched: selection.matchedRuns.length,
+        planned: selection.candidates.length,
+        repo: params.resolvedRepo,
+        skippedByAge: selection.skippedByAge,
+        skippedByExclusion: selection.skippedByExclusion,
+        statuses: params.statuses,
+    };
+
+    printRepositorySummary(summary, selection, params);
+    return succeed(summary);
+}
+
+function readNormalizedString(
+    value: ParsedOptions[string] | undefined
+): string | undefined {
+    if (typeof value !== "string") {
+        return undefined;
     }
 
-    const limit = Number.parseInt(String(options["limit"] ?? "500"), 10);
-    if (!Number.isFinite(limit) || limit < 1) {
-        return emitError(
-            "--limit must be a positive integer.",
-            "validation_error",
-            jsonOutput,
-            styler
+    const normalized = value.trim().toLowerCase();
+    return normalized.length > 0 ? normalized : undefined;
+}
+
+function reportDeletionFailure(
+    runId: number,
+    result: Readonly<ReturnType<typeof deleteRunWithRetry>>,
+    params: ProcessRepositoryParams
+): void {
+    if (params.verbose && !params.jsonOutput) {
+        console.error(
+            `Delete failed for run ${runId} after ${result.attempts} attempt(s): ${result.error ?? "unknown"}`
         );
     }
+}
 
-    const maxDeleteOption = options["max-delete"];
-    const maxDelete =
-        typeof maxDeleteOption === "string"
-            ? Number.parseInt(maxDeleteOption, 10)
-            : undefined;
-    if (
-        maxDeleteOption !== undefined &&
-        (typeof maxDelete !== "number" ||
-            !Number.isFinite(maxDelete) ||
-            maxDelete < 1)
-    ) {
-        return emitError(
-            "--max-delete must be a positive integer.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const beforeDaysOption = options["before-days"];
-    const beforeDays =
-        typeof beforeDaysOption === "string"
-            ? Number.parseInt(beforeDaysOption, 10)
-            : undefined;
-    if (
-        beforeDaysOption !== undefined &&
-        (typeof beforeDays !== "number" ||
-            !Number.isFinite(beforeDays) ||
-            beforeDays < 0)
-    ) {
-        return emitError(
-            "--before-days must be a non-negative integer.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const maxRetriesOption = options["max-retries"];
-    const maxRetries =
-        typeof maxRetriesOption === "string"
-            ? Number.parseInt(maxRetriesOption, 10)
-            : 2;
-    if (!Number.isFinite(maxRetries) || maxRetries < 0) {
-        return emitError(
-            "--max-retries must be a non-negative integer.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const retryDelayOption = options["retry-delay-ms"];
-    const retryDelayMs =
-        typeof retryDelayOption === "string"
-            ? Number.parseInt(retryDelayOption, 10)
-            : 200;
-    if (!Number.isFinite(retryDelayMs) || retryDelayMs < 0) {
-        return emitError(
-            "--retry-delay-ms must be a non-negative integer.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const maxFailuresOption = options["max-failures"];
-    const maxFailures =
-        typeof maxFailuresOption === "string"
-            ? Number.parseInt(maxFailuresOption, 10)
-            : undefined;
-    if (
-        maxFailuresOption !== undefined &&
-        (typeof maxFailures !== "number" ||
-            !Number.isFinite(maxFailures) ||
-            maxFailures < 1)
-    ) {
-        return emitError(
-            "--max-failures must be a positive integer.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const orderOption = options["order"];
-    const order =
-        typeof orderOption === "string" && orderOption.length > 0
-            ? orderOption.toLowerCase()
-            : "oldest";
-    if (order !== "oldest" && order !== "newest" && order !== "none") {
-        return emitError(
-            "--order must be one of: oldest, newest, none.",
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
-
-    const repoOption =
-        typeof options["repo"] === "string"
-            ? options["repo"].trim()
-            : undefined;
-    const reposOption = collectStringListOption(options, "repos");
-    const allReposMode = options["all-repos"] === true;
+function resolveAllRepositories(
+    options: Readonly<ParsedOptions>,
+    isJsonOutput: boolean,
+    styler: Styler
+): StepResult<readonly string[]> {
     const ownerOption =
-        typeof options["owner"] === "string" &&
-        options["owner"].trim().length > 0
-            ? options["owner"].trim()
-            : undefined;
+        typeof options["owner"] === "string" ? options["owner"].trim() : "";
+    const owner =
+        ownerOption.length > 0 ? ownerOption : resolveAuthenticatedLogin();
+    if (typeof owner !== "string" || owner.length === 0) {
+        return createErrorResult(
+            "unable to resolve authenticated user for --all-repos. Pass --owner <login>.",
+            "validation_error",
+            isJsonOutput,
+            styler
+        );
+    }
 
-    if (
-        allReposMode &&
-        (typeof repoOption === "string" || reposOption.length > 0)
-    ) {
-        return emitError(
+    try {
+        const targetRepos = listReposForOwner(owner);
+        return targetRepos.length > 0
+            ? succeed(targetRepos)
+            : createErrorResult(
+                  `no repositories found for ${owner}.`,
+                  "validation_error",
+                  isJsonOutput,
+                  styler
+              );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return createErrorResult(
+            `failed to list repositories: ${message}`,
+            "gh_cli_error",
+            isJsonOutput,
+            styler
+        );
+    }
+}
+
+function resolveDisplayMode(
+    options: Readonly<ParsedOptions>,
+    key: "color" | "unicode",
+    forcedValue: string | undefined
+): string {
+    return forcedValue ?? readNormalizedString(options[key]) ?? "auto";
+}
+
+function resolveExplicitOrCurrentRepo(
+    explicitRepos: readonly string[],
+    isJsonOutput: boolean,
+    styler: Styler
+): StepResult<readonly string[]> {
+    if (explicitRepos.length > 0) {
+        return succeed(explicitRepos);
+    }
+
+    const resolved = resolveRepo(undefined);
+    if (typeof resolved === "string" && resolved.length > 0) {
+        return succeed([resolved]);
+    }
+
+    if (!isJsonOutput) {
+        console.log(printHelp());
+    }
+    return createErrorResult(
+        "unable to resolve repository. Provide --repo <owner/name> / --repos <owner/name,..> or run inside a GitHub repository.",
+        "validation_error",
+        isJsonOutput,
+        styler
+    );
+}
+
+function resolveTargetRepos(
+    options: Readonly<ParsedOptions>,
+    isJsonOutput: boolean,
+    styler: Styler
+): StepResult<readonly string[]> {
+    const repoOption =
+        typeof options["repo"] === "string" ? options["repo"].trim() : "";
+    const explicitRepos = [
+        ...(repoOption.length > 0 ? [repoOption] : []),
+        ...collectStringListOption(options, "repos"),
+    ];
+    const isAllReposMode = options["all-repos"] === true;
+
+    if (isAllReposMode && explicitRepos.length > 0) {
+        return createErrorResult(
             "--all-repos cannot be combined with --repo or --repos.",
             "validation_error",
-            jsonOutput,
+            isJsonOutput,
             styler
         );
+    }
+
+    const invalidExplicitRepos = explicitRepos.filter(
+        (repo) => !isValidRepoSlug(repo)
+    );
+    if (invalidExplicitRepos.length > 0) {
+        return invalidReposResult(invalidExplicitRepos, isJsonOutput, styler);
     }
 
     const authResult = runGh(["auth", "status"]);
     if (authResult.status !== 0) {
-        return emitError(
+        return createErrorResult(
             "gh CLI is not authenticated. Run: gh auth login",
             "auth_error",
-            jsonOutput,
+            isJsonOutput,
             styler
         );
     }
 
-    let targetRepos: string[] = [];
-
-    if (allReposMode) {
-        const owner = ownerOption ?? resolveAuthenticatedLogin();
-        if (typeof owner !== "string" || owner.length === 0) {
-            return emitError(
-                "unable to resolve authenticated user for --all-repos. Pass --owner <login>.",
-                "validation_error",
-                jsonOutput,
-                styler
-            );
-        }
-
-        try {
-            targetRepos = listReposForOwner(owner);
-        } catch (error) {
-            const message =
-                error instanceof Error ? error.message : String(error);
-            return emitError(
-                `failed to list repositories: ${message}`,
-                "gh_cli_error",
-                jsonOutput,
-                styler
-            );
-        }
-
-        if (targetRepos.length === 0) {
-            return emitError(
-                `no repositories found for ${owner}.`,
-                "validation_error",
-                jsonOutput,
-                styler
-            );
-        }
-    } else {
-        if (typeof repoOption === "string" && repoOption.length > 0) {
-            targetRepos.push(repoOption);
-        }
-
-        targetRepos.push(...reposOption);
-
-        if (targetRepos.length === 0) {
-            const resolved = resolveRepo(undefined);
-            if (typeof resolved !== "string" || resolved.length === 0) {
-                if (!jsonOutput) {
-                    console.log(printHelp());
-                }
-                return emitError(
-                    "unable to resolve repository. Provide --repo <owner/name> / --repos <owner/name,..> or run inside a GitHub repository.",
-                    "validation_error",
-                    jsonOutput,
-                    styler
-                );
-            }
-
-            targetRepos = [resolved];
-        }
+    const targetResult = isAllReposMode
+        ? resolveAllRepositories(options, isJsonOutput, styler)
+        : resolveExplicitOrCurrentRepo(explicitRepos, isJsonOutput, styler);
+    if (!targetResult.ok) {
+        return targetResult;
     }
 
-    targetRepos = Array.from(new Set(targetRepos));
-
-    const invalidRepoValues = targetRepos.filter(
+    const targetRepos = [...new Set(targetResult.value)];
+    const invalidTargetRepos = targetRepos.filter(
         (repo) => !isValidRepoSlug(repo)
     );
-    if (invalidRepoValues.length > 0) {
-        return emitError(
-            `invalid repository values: ${invalidRepoValues.join(", ")}. Use owner/name format.`,
-            "validation_error",
-            jsonOutput,
-            styler
-        );
-    }
+    return invalidTargetRepos.length > 0
+        ? invalidReposResult(invalidTargetRepos, isJsonOutput, styler)
+        : succeed(targetRepos);
+}
 
-    options["limit"] = String(limit);
+function selectRuns(
+    allRuns: readonly WorkflowRun[],
+    params: ProcessRepositoryParams
+): RunSelection {
+    const seenRunIds = new Set<number>();
+    const deduplicatedRuns = allRuns.filter((run) => {
+        const isDuplicate = seenRunIds.has(run.databaseId);
+        seenRunIds.add(run.databaseId);
+        return !isDuplicate;
+    });
+    const orderedRuns = sortRuns(deduplicatedRuns, params.order);
+
+    let skippedByExclusion = 0;
+    const includedRuns = orderedRuns.filter((run) => {
+        const workflowName = run.workflowName?.toLowerCase();
+        const branchName = run.headBranch?.toLowerCase();
+        const isExcluded =
+            (workflowName !== undefined &&
+                params.excludedWorkflowNames.has(workflowName)) ||
+            (branchName !== undefined &&
+                params.excludedBranchNames.has(branchName));
+        skippedByExclusion += isExcluded ? 1 : 0;
+        return !isExcluded;
+    });
+
+    let skippedByAge = 0;
+    const ageCutoffEpoch =
+        params.beforeDays === undefined
+            ? undefined
+            : Date.now() - params.beforeDays * 24 * 60 * 60 * 1000;
+    const matchedRuns = includedRuns.filter((run) => {
+        const createdEpoch = getCreatedAtEpoch(run);
+        const isIncluded =
+            ageCutoffEpoch === undefined ||
+            (Number.isFinite(createdEpoch) && createdEpoch <= ageCutoffEpoch);
+        skippedByAge += isIncluded ? 0 : 1;
+        return isIncluded;
+    });
+    const candidates =
+        params.maxDelete === undefined
+            ? matchedRuns
+            : matchedRuns.slice(0, params.maxDelete);
 
     return {
-        beforeDays,
-        ciMode,
-        dryRun,
-        excludedBranchNames,
-        excludedWorkflowNames,
-        failFast,
-        jsonOutput,
-        limit,
-        maxDelete,
-        maxFailures,
-        maxRetries,
-        noProgress,
-        options,
-        order,
-        quiet,
-        retryDelayMs,
-        statuses,
-        styler,
-        summaryMode,
-        targetRepos,
-        unicodeTables,
-        verbose,
+        candidates,
+        deduplicatedCount: deduplicatedRuns.length,
+        matchedRuns,
+        skippedByAge,
+        skippedByExclusion,
     };
 }
 
-export function main(argv: string[]): number {
-    const startedAt = Date.now();
-    const options = parseArguments(argv);
-    const built = buildExecutionConfig(options);
-    if (typeof built === "number") {
-        return built;
-    }
-
-    const {
-        beforeDays,
-        ciMode,
-        dryRun,
-        excludedBranchNames,
-        excludedWorkflowNames,
-        failFast,
-        jsonOutput,
-        limit,
-        maxDelete,
-        maxFailures,
-        maxRetries,
-        noProgress,
-        options: normalizedOptions,
-        order,
-        quiet,
-        retryDelayMs,
-        statuses,
-        styler,
-        summaryMode,
-        targetRepos,
-        unicodeTables,
-        verbose,
-    } = built;
-
-    const repoSummaries: RunSummary[] = [];
-
-    for (const [repoIndex, resolvedRepo] of targetRepos.entries()) {
-        const result = processRepository({
-            beforeDays,
-            ciMode,
-            dryRun,
-            excludedBranchNames,
-            excludedWorkflowNames,
-            failFast,
-            jsonOutput,
-            limit,
-            maxDelete,
-            maxFailures,
-            maxRetries,
-            noProgress,
-            options: normalizedOptions,
-            order,
-            quiet,
-            repoIndex,
-            repoTotal: targetRepos.length,
-            resolvedRepo,
-            retryDelayMs,
-            statuses,
-            styler,
-            summaryMode,
-            unicodeTables,
-            verbose,
-        });
-
-        if (typeof result === "number") {
-            return result;
-        }
-
-        repoSummaries.push(result);
-    }
-
-    if (jsonOutput) {
-        printJsonSummaries(repoSummaries, dryRun, startedAt);
-    }
-
-    const hasFailures = repoSummaries.some((summary) => summary.failed > 0);
-    return hasFailures ? 2 : 0;
+function succeed<T>(value: T): SuccessResult<T> {
+    return { ok: true, value };
 }
 
 const isDirectExecution =
     typeof process.argv[1] === "string" &&
     typeof import.meta.url === "string" &&
-    fileURLToPath(import.meta.url) === process.argv[1];
+    import.meta.filename === process.argv[1];
 
+/** Execute the CLI using the current process arguments. */
 export function runCli(): void {
     process.exitCode = main(process.argv.slice(2));
 }

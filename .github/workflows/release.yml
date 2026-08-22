@@ -32,11 +32,6 @@ on:
                 required: false
                 default: "main"
                 type: "string"
-            skip_verify:
-                description: "Skip release verification (manual dispatch only; use with caution)"
-                required: false
-                default: false
-                type: "boolean"
 
 defaults:
     run:
@@ -66,7 +61,7 @@ jobs:
 
         steps:
             - name: "Harden the runner (Audit all outbound calls)"
-              uses: "step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920" # v2.20.0
+              uses: "step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c" # v2.21.0
               with:
                   egress-policy: "audit"
 
@@ -108,8 +103,11 @@ jobs:
                   cache: "npm"
                   cache-dependency-path: "package-lock.json"
 
-            - name: "Install dependencies"
-              run: "npm ci"
+            - name: "Install dependencies without lifecycle scripts"
+              run: "npm ci --ignore-scripts"
+
+            - name: "Rebuild allowlisted native dependencies"
+              run: "npm rebuild esbuild unrs-resolver"
 
             - name: "Configure Git for release automation"
               if: "github.event_name == 'workflow_dispatch'"
@@ -157,22 +155,14 @@ jobs:
                     exit 1
                   fi
 
-            - name: "Warn when verification is skipped"
-              if: "${{ github.event_name == 'workflow_dispatch' && inputs.skip_verify }}"
-              run: |
-                  echo "::warning::Skipping 'release:check' because workflow_dispatch input 'skip_verify' is true."
-                  echo "::warning::Use this only when release checks were validated locally before dispatch."
-
             - name: "Verify release"
-              if: "${{ github.event_name != 'workflow_dispatch' || !inputs.skip_verify }}"
               run: "npm run release:check"
 
-            - name: "Ensure verification did not modify tracked files"
-              if: "startsWith(github.ref, 'refs/tags/v')"
+            - name: "Ensure verification did not modify repository files"
               run: |
                   set -euo pipefail
-                  if ! git diff --quiet || ! git diff --cached --quiet; then
-                    echo "release:check modified files on a tag-triggered release. Ensure the branch is clean before tagging." >&2
+                  if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+                    echo "release:check modified repository files. Release verification must be read-only." >&2
                     git status --short
                     exit 1
                   fi
@@ -216,25 +206,43 @@ jobs:
               run: "npm run build"
 
             - name: "Build Linux extension asset"
-              run: "npm run build:assets -- --platform linux --arch amd64"
+              run: "npm run build:assets -- -- --platform linux --arch amd64"
 
             - name: "Download Windows Node.js runtime"
               run: |
                   set -euo pipefail
                   node_version="$(cat .node-version)"
+                  archive_name="node-v${node_version}-win-x64.zip"
                   mkdir -p temp
-                  curl -fsSLo temp/node-windows-x64.zip "https://nodejs.org/dist/v${node_version}/node-v${node_version}-win-x64.zip"
-                  unzip -q temp/node-windows-x64.zip -d temp
+                  curl --fail --show-error --silent --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+                    --output "temp/${archive_name}" "https://nodejs.org/dist/v${node_version}/${archive_name}"
+                  curl --fail --show-error --silent --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+                    --output temp/SHASUMS256.txt "https://nodejs.org/dist/v${node_version}/SHASUMS256.txt"
+                  grep -F "  ${archive_name}" temp/SHASUMS256.txt | (cd temp && sha256sum --check -)
+                  unzip -q "temp/${archive_name}" -d temp
                   mv "temp/node-v${node_version}-win-x64" "${WINDOWS_NODE_DIR}"
 
             - name: "Build Windows extension asset"
               run: >-
-                  npm run build:assets -- --platform windows --arch amd64 --node-executable "${WINDOWS_NODE_DIR}/node.exe"
+                  npm run build:assets -- -- --platform windows --arch amd64 --node-executable "${WINDOWS_NODE_DIR}/node.exe"
 
-            - name: "Commit and push release version + tag"
+            - name: "Generate and verify release checksums"
+              env:
+                  PACKAGE_NAME: "${{ steps.version.outputs.package_name }}"
+              run: |
+                  set -euo pipefail
+                  test -x "dist/${PACKAGE_NAME}-linux-amd64"
+                  test -s "dist/${PACKAGE_NAME}-windows-amd64.exe"
+                  file "dist/${PACKAGE_NAME}-windows-amd64.exe" | grep -q 'PE32+ executable'
+                  (
+                    cd dist
+                    sha256sum "${PACKAGE_NAME}-linux-amd64" "${PACKAGE_NAME}-windows-amd64.exe" > SHA256SUMS
+                    sha256sum --check SHA256SUMS
+                  )
+
+            - name: "Create release version commit and tag"
               if: "github.event_name == 'workflow_dispatch'"
               env:
-                  BRANCH: "${{ steps.target_ref.outputs.branch }}"
                   TAG: "${{ steps.version.outputs.tag }}"
               run: |
                   set -euo pipefail
@@ -252,8 +260,6 @@ jobs:
 
                   git commit -m "chore: release ${TAG}"
                   git tag -a "$TAG" -m "$TAG"
-                  git push origin "HEAD:${BRANCH}"
-                  git push origin "$TAG"
 
             - name: "Generate release notes"
               env:
@@ -265,6 +271,7 @@ jobs:
                   mkdir -p temp
 
                   previous_tag=$(git tag --sort=-version:refname | grep -Fxv "$TAG" | head -n 1 || true)
+                  release_commit=$(git rev-parse HEAD)
 
                   {
                     echo "# ${PACKAGE_NAME} ${TAG}"
@@ -281,7 +288,7 @@ jobs:
                     echo ""
                     echo "- Version: \`${VERSION}\`"
                     echo "- Tag: \`${TAG}\`"
-                    echo "- Commit: \`${GITHUB_SHA}\`"
+                    echo "- Commit: \`${release_commit}\`"
                     echo ""
                     if [ -n "$previous_tag" ]; then
                       echo "## Compare"
@@ -305,6 +312,15 @@ jobs:
                   path: "${{ env.RELEASE_NOTES_PATH }}"
                   if-no-files-found: "error"
 
+            - name: "Push release version and tag atomically"
+              if: "github.event_name == 'workflow_dispatch'"
+              env:
+                  BRANCH: "${{ steps.target_ref.outputs.branch }}"
+                  TAG: "${{ steps.version.outputs.tag }}"
+              run: |
+                  set -euo pipefail
+                  git push --atomic origin "HEAD:${BRANCH}" "${TAG}"
+
             - name: "Create GitHub release"
               uses: "softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228" # v3.0.2
               with:
@@ -315,7 +331,8 @@ jobs:
                   files: |
                       dist/${{ steps.version.outputs.package_name }}-linux-amd64
                       dist/${{ steps.version.outputs.package_name }}-windows-amd64.exe
-                  fail_on_unmatched_files: false
+                      dist/SHA256SUMS
+                  fail_on_unmatched_files: true
                   overwrite_files: true
               env:
                   GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

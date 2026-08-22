@@ -12,6 +12,7 @@
 **/dist/
 **/node_modules/
 **/playwright-report/
+**/reports/
 **/temp/
 **/test-results/
 **/tmp/
@@ -39,6 +40,7 @@
 **/build/
 **/dist/
 **/generated/
+.lychee.report.md
 
 # API reference files (if auto-generated)
 **/api-reference/

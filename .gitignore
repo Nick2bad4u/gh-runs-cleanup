@@ -828,7 +828,8 @@ node_modules/
 node_modules_backup/
 
 # NPM
-.npmrc
+# Keep shared npm policy in .npmrc; ignore machine-local overrides instead.
+.npmrc.local
 
 # OhMyPosh
 !.vscode/OhMyPosh-Atomic-Custom.json
