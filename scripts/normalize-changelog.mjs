@@ -1,14 +1,10 @@
-#!/usr/bin/env node
-
 import { readFile, writeFile } from "node:fs/promises";
+
+import { normalizeDependabotPrefixes } from "./changelog-normalization.mts";
 
 const changelogPath = new URL("../CHANGELOG.md", import.meta.url);
 const original = await readFile(changelogPath, "utf8");
-const normalized = original.replace(
-    /^(\s*)(\[dependabot\](?:\[[^\]\r\n]+\])*\([^)]+\)):/gmu,
-    (_match, indentation, prefix) =>
-        `${indentation}${prefix.replaceAll("[", "\\[").replaceAll("]", "\\]")}:`
-);
+const normalized = normalizeDependabotPrefixes(original);
 
 if (normalized !== original) {
     await writeFile(changelogPath, normalized, "utf8");

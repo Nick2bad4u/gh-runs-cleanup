@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Synchronize repository Node version files.
  *
@@ -37,7 +35,7 @@ const normalizeNodeVersion = (version) => {
         throw new TypeError("Expected a string Node.js version.");
     }
 
-    const trimmedVersion = version.trim().replace(/^v/iu, "");
+    const trimmedVersion = version.trim().replace(/^v/iv, "");
 
     if (!/^\d+\.\d+\.\d+$/v.test(trimmedVersion)) {
         throw new TypeError(
@@ -58,6 +56,74 @@ const normalizeNodeVersion = (version) => {
 const isRecord = (value) => typeof value === "object" && value !== null;
 
 /**
+ * Parse one command-line argument and report the next loop position.
+ *
+ * @param {readonly string[]} argumentList
+ * @param {number} index
+ *
+ * @returns {{
+ *     checkCurrent: boolean;
+ *     checkOnly: boolean;
+ *     explicitVersion: string | null;
+ *     nextIndex: number;
+ * }}
+ */
+const parseArgumentAtIndex = (argumentList, index) => {
+    const argument = argumentList[index];
+    if (typeof argument !== "string") {
+        throw new TypeError(
+            `Expected a string command-line argument at index ${index}.`
+        );
+    }
+
+    switch (argument) {
+        case "--check": {
+            return {
+                checkCurrent: false,
+                checkOnly: true,
+                explicitVersion: null,
+                nextIndex: index,
+            };
+        }
+        case "--check-current": {
+            return {
+                checkCurrent: true,
+                checkOnly: false,
+                explicitVersion: null,
+                nextIndex: index,
+            };
+        }
+        case "--version": {
+            const nextArgument = argumentList[index + 1];
+            if (typeof nextArgument !== "string") {
+                throw new TypeError("Expected a version after --version.");
+            }
+
+            return {
+                checkCurrent: false,
+                checkOnly: false,
+                explicitVersion: normalizeNodeVersion(nextArgument),
+                nextIndex: index + 1,
+            };
+        }
+        default: {
+            if (!argument.startsWith("--version=")) {
+                throw new TypeError(`Unknown argument: ${argument}`);
+            }
+
+            return {
+                checkCurrent: false,
+                checkOnly: false,
+                explicitVersion: normalizeNodeVersion(
+                    argument.slice("--version=".length)
+                ),
+                nextIndex: index,
+            };
+        }
+    }
+};
+
+/**
  * Parse command-line arguments.
  *
  * Supported options:
@@ -76,62 +142,32 @@ const isRecord = (value) => typeof value === "object" && value !== null;
  */
 const parseArguments = (argumentList) => {
     /** @type {boolean} */
-    let checkOnly = false;
+    let shouldCheckOnly = false;
     /** @type {boolean} */
-    let checkCurrent = false;
+    let shouldCheckCurrent = false;
     /** @type {string | null} */
     let explicitVersion = null;
 
-    for (let index = 0; index < argumentList.length; index += 1) {
-        const argument = argumentList[index];
-
-        if (typeof argument !== "string") {
-            throw new TypeError(
-                `Expected a string command-line argument at index ${index}.`
-            );
+    let index = 0;
+    while (index < argumentList.length) {
+        const parsedArgument = parseArgumentAtIndex(argumentList, index);
+        shouldCheckOnly ||= parsedArgument.checkOnly;
+        shouldCheckCurrent ||= parsedArgument.checkCurrent;
+        if (parsedArgument.explicitVersion !== null) {
+            explicitVersion = parsedArgument.explicitVersion;
         }
-
-        if (argument === "--check") {
-            checkOnly = true;
-            continue;
-        }
-
-        if (argument === "--check-current") {
-            checkCurrent = true;
-            continue;
-        }
-
-        if (argument === "--version") {
-            const nextArgument = argumentList[index + 1];
-
-            if (typeof nextArgument !== "string") {
-                throw new TypeError("Expected a version after --version.");
-            }
-
-            explicitVersion = normalizeNodeVersion(nextArgument);
-            index += 1;
-            continue;
-        }
-
-        if (argument.startsWith("--version=")) {
-            explicitVersion = normalizeNodeVersion(
-                argument.slice("--version=".length)
-            );
-            continue;
-        }
-
-        throw new TypeError(`Unknown argument: ${argument}`);
+        index = parsedArgument.nextIndex + 1;
     }
 
-    if (checkOnly && checkCurrent) {
+    if (shouldCheckOnly && shouldCheckCurrent) {
         throw new TypeError(
             "Use either --check or --check-current, but not both together."
         );
     }
 
     return {
-        checkCurrent,
-        checkOnly,
+        checkCurrent: shouldCheckCurrent,
+        checkOnly: shouldCheckOnly,
         explicitVersion,
     };
 };
@@ -143,15 +179,18 @@ const parseArguments = (argumentList) => {
  */
 const readPackageJson = async () => {
     const packageJsonContent = await readFile(packageJsonPath, "utf8");
-
-    return /** @type {Record<string, unknown>} */ (
+    const parsedPackageJson = /** @type {unknown} */ (
         JSON.parse(packageJsonContent)
     );
+    if (!isRecord(parsedPackageJson)) {
+        throw new TypeError("Expected package.json to contain an object.");
+    }
+
+    return parsedPackageJson;
 };
 
 /**
- * Extract the minimum supported Node.js version when `engines.node` uses the
- * repository's current `>=x.y.z` form.
+ * Extract the lowest exact version mentioned by the Node.js engine range.
  *
  * @param {unknown} enginesValue
  *
@@ -163,9 +202,15 @@ const resolveMinimumEngineVersion = (enginesValue) => {
     }
 
     const nodeEngineRange = enginesValue["node"].trim();
-    const match = /^>=\s*(\d+\.\d+\.\d+)$/v.exec(nodeEngineRange);
-
-    return match?.[1] ?? null;
+    const versions = nodeEngineRange
+        .matchAll(/\d{1,10}\.\d{1,10}\.\d{1,10}/gv)
+        .map(([version]) => version)
+        .toArray();
+    return (
+        versions.toSorted((left, right) =>
+            compareExactVersions(left, right)
+        )[0] ?? null
+    );
 };
 
 /**
@@ -176,7 +221,7 @@ const resolveMinimumEngineVersion = (enginesValue) => {
  *
  * @returns {number}
  */
-const compareExactVersions = (leftVersion, rightVersion) => {
+function compareExactVersions(leftVersion, rightVersion) {
     const leftSegments = leftVersion.split(".").map(Number);
     const rightSegments = rightVersion.split(".").map(Number);
 
@@ -194,7 +239,7 @@ const compareExactVersions = (leftVersion, rightVersion) => {
     }
 
     return 0;
-};
+}
 
 /**
  * Ensure the preferred version does not fall below the minimum supported

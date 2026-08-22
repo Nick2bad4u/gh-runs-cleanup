@@ -11,6 +11,13 @@ interface HelpSection {
     title: string;
 }
 
+interface HelpStyles {
+    arg: (text: string) => string;
+    flag: (text: string) => string;
+    heading: (text: string) => string;
+    title: (text: string) => string;
+}
+
 const HELP_SECTIONS: HelpSection[] = [
     {
         options: [
@@ -224,65 +231,35 @@ const HELP_EXAMPLES = [
 
 /** Build the complete CLI help text, optionally with terminal styling. */
 export function buildHelpText(styler?: Styler): string {
-    const heading = (text: string): string =>
-        styler === undefined ? text : styler.info(text);
-    const flag = (text: string): string =>
-        styler === undefined ? text : styler.flag(text);
-    const arg = (text: string): string =>
-        styler === undefined ? text : styler.arg(text);
-    const title = (text: string): string =>
-        styler === undefined ? text : styler.heading(text);
+    const styles = createHelpStyles(styler);
 
     const optionLabelWidths = HELP_SECTIONS.flatMap((section) =>
-        (section.options ?? []).map((option) => {
-            const argSuffix =
-                typeof option.arg === "string" && option.arg.length > 0
-                    ? ` ${option.arg}`
-                    : "";
-            return `${option.flag}${argSuffix}`.length;
-        })
+        (section.options ?? []).map((option) =>
+            getHelpOptionLabelLength(option)
+        )
     );
     const maxLabelWidth = Math.max(...optionLabelWidths, 0);
 
-    const lines: string[] = [
-        title("gh-runs-cleanup"),
+    const lines: readonly string[] = [
+        styles.title("gh-runs-cleanup"),
         "",
         "  Delete GitHub Actions workflow runs using the gh CLI.",
         "",
-        heading("  Usage:"),
-        `    ${styleCommandExample("gh runs-cleanup", styler)} ${arg("[options]")}`,
+        styles.heading("  Usage:"),
+        `    ${styleCommandExample("gh runs-cleanup", styler)} ${styles.arg("[options]")}`,
         "",
+        ...HELP_SECTIONS.flatMap((section) =>
+            renderHelpSection(section, maxLabelWidth, styles)
+        ),
+        styles.heading("  Notes:"),
+        ...HELP_NOTES.map((note) => `    ${styleCommandExample(note, styler)}`),
+        "",
+        styles.heading("  Examples:"),
+        ...HELP_EXAMPLES.map(
+            (example) => `    ${styleCommandExample(example, styler)}`
+        ),
+        "  ",
     ];
-
-    for (const section of HELP_SECTIONS) {
-        lines.push(heading(`  ${section.title}:`));
-        if (section.options !== undefined) {
-            for (const option of section.options) {
-                const argument = option.arg;
-                const hasArgument =
-                    typeof argument === "string" && argument.length > 0;
-                const plainArgPart = hasArgument ? ` ${argument}` : "";
-                const styledArgPart = hasArgument ? ` ${arg(argument)}` : "";
-                const labelPlain = `${option.flag}${plainArgPart}`;
-                const labelStyled = `${flag(option.flag)}${styledArgPart}`;
-                const spacing = " ".repeat(
-                    maxLabelWidth - labelPlain.length + 2
-                );
-                lines.push(`    ${labelStyled}${spacing}${option.description}`);
-            }
-        }
-        lines.push("");
-    }
-
-    lines.push(heading("  Notes:"));
-    for (const note of HELP_NOTES) {
-        lines.push(`    ${styleCommandExample(note, styler)}`);
-    }
-    lines.push("", heading("  Examples:"));
-    for (const example of HELP_EXAMPLES) {
-        lines.push(`    ${styleCommandExample(example, styler)}`);
-    }
-    lines.push("  ");
 
     return lines.join("\n");
 }
@@ -295,6 +272,59 @@ export function printHelp(): string {
 /** Render CLI help text using the supplied terminal styler. */
 export function renderHelpText(styler: Styler): string {
     return buildHelpText(styler);
+}
+
+function createHelpStyles(styler: Styler | undefined): HelpStyles {
+    return {
+        arg: (text) => (styler === undefined ? text : styler.arg(text)),
+        flag: (text) => (styler === undefined ? text : styler.flag(text)),
+        heading: (text) => (styler === undefined ? text : styler.info(text)),
+        title: (text) => (styler === undefined ? text : styler.heading(text)),
+    };
+}
+
+function getHelpOptionArgument(
+    option: Readonly<HelpOption>
+): string | undefined {
+    return option.arg === undefined || option.arg.length === 0
+        ? undefined
+        : option.arg;
+}
+
+function getHelpOptionLabelLength(option: Readonly<HelpOption>): number {
+    const argument = getHelpOptionArgument(option);
+    const argumentSuffix = argument === undefined ? "" : ` ${argument}`;
+    return `${option.flag}${argumentSuffix}`.length;
+}
+
+function renderHelpOption(
+    option: Readonly<HelpOption>,
+    maxLabelWidth: number,
+    styles: Readonly<HelpStyles>
+): string {
+    const argument = getHelpOptionArgument(option);
+    const plainArgument = argument === undefined ? "" : ` ${argument}`;
+    const styledArgument =
+        argument === undefined ? "" : ` ${styles.arg(argument)}`;
+    const plainLabel = `${option.flag}${plainArgument}`;
+    const styledLabel = `${styles.flag(option.flag)}${styledArgument}`;
+    const spacing = " ".repeat(maxLabelWidth - plainLabel.length + 2);
+    return `    ${styledLabel}${spacing}${option.description}`;
+}
+
+function renderHelpSection(
+    section: Readonly<HelpSection>,
+    maxLabelWidth: number,
+    styles: Readonly<HelpStyles>
+): readonly string[] {
+    const options = section.options ?? [];
+    return [
+        styles.heading(`  ${section.title}:`),
+        ...options.map((option) =>
+            renderHelpOption(option, maxLabelWidth, styles)
+        ),
+        "",
+    ];
 }
 
 function styleCommandExample(command: string, styler?: Styler): string {

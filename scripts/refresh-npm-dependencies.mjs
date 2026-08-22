@@ -1,9 +1,7 @@
-#!/usr/bin/env node
-
 import { spawnSync } from "node:child_process";
 
-const npmCliPath = process.env.npm_execpath;
-if (!npmCliPath) {
+const npmCliPath = process.env["npm_execpath"];
+if (typeof npmCliPath !== "string" || npmCliPath.length === 0) {
     throw new Error("npm_execpath is required to refresh dependencies.");
 }
 

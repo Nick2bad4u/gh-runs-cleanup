@@ -5,7 +5,7 @@ import { formatTable } from "./cli-styling.ts";
 /** Parse a GitHub workflow run's ISO creation time for chronological sorting. */
 export function getCreatedAtEpoch(run: WorkflowRun): number {
     if (typeof run.createdAt !== "string" || run.createdAt.length === 0) {
-        return NaN;
+        return Number.NaN;
     }
 
     return Date.parse(run.createdAt);

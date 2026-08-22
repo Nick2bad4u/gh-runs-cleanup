@@ -1,16 +1,22 @@
-#!/usr/bin/env node
-
+import { build } from "esbuild";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import * as nodePath from "node:path";
 
-import { build } from "esbuild";
+const repositoryRoot = nodePath.resolve(import.meta.dirname, "..");
+const packageJsonPath = nodePath.join(repositoryRoot, "package.json");
+const parsedPackageJson = /** @type {unknown} */ (
+    JSON.parse(readFileSync(packageJsonPath, "utf8"))
+);
+if (!isRecord(parsedPackageJson)) {
+    throw new TypeError("Expected package.json to contain an object.");
+}
 
-const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const packageJsonPath = join(repositoryRoot, "package.json");
-const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+const packageName = parsedPackageJson.name;
+if (typeof packageName !== "string" || !packageName.startsWith("gh-")) {
+    throw new Error("package.json name must be a gh-* extension name.");
+}
 
 const osNames = new Map([
     ["darwin", "darwin"],
@@ -24,28 +30,57 @@ const architectureNames = new Map([
     ["x64", "amd64"],
 ]);
 
+const supportedArchitectures = new Set([
+    "386",
+    "amd64",
+    "arm64",
+]);
+const supportedPlatforms = new Set([
+    "darwin",
+    "linux",
+    "windows",
+]);
+
+/**
+ * @param {unknown} value
+ *
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return typeof value === "object" && value !== null;
+}
+
+/**
+ * @param {string} name
+ *
+ * @returns {string | undefined}
+ */
 function readOption(name) {
     const prefix = `--${name}=`;
     const inline = process.argv.find((argument) => argument.startsWith(prefix));
-    if (inline) {
+    if (inline !== undefined) {
         return inline.slice(prefix.length);
     }
 
     const index = process.argv.indexOf(`--${name}`);
-    if (index >= 0) {
+    if (index !== -1) {
         return process.argv[index + 1];
     }
 
     return undefined;
 }
 
-function run(command, args) {
-    const result = spawnSync(command, args, {
+/**
+ * @param {string} command
+ * @param {readonly string[]} argumentList
+ */
+function run(command, argumentList) {
+    const result = spawnSync(command, argumentList, {
         cwd: repositoryRoot,
         stdio: "inherit",
     });
 
-    if (result.error) {
+    if (result.error !== undefined) {
         throw result.error;
     }
 
@@ -56,24 +91,32 @@ function run(command, args) {
     }
 }
 
+/**
+ * @param {string} executablePath
+ * @param {string} expectedHeading
+ */
 function smokeTestExecutable(executablePath, expectedHeading) {
     const result = spawnSync(executablePath, ["--help"], {
         cwd: repositoryRoot,
         encoding: "utf8",
     });
 
-    if (result.error) {
+    if (result.error !== undefined) {
         throw result.error;
     }
 
     if (result.status !== 0) {
+        const exitStatus =
+            typeof result.status === "number"
+                ? result.status.toString()
+                : "unknown";
         throw new Error(
-            `${executablePath} --help exited with status ${result.status ?? "unknown"}: ${result.stderr}`
+            `${executablePath} --help exited with status ${exitStatus}: ${result.stderr}`
         );
     }
 
     const headingCount = result.stdout
-        .split(/\r?\n/u)
+        .split(/\r?\n/v)
         .filter((line) => line === expectedHeading).length;
     if (headingCount !== 1) {
         throw new Error(
@@ -82,48 +125,34 @@ function smokeTestExecutable(executablePath, expectedHeading) {
     }
 }
 
-const packageName = packageJson.name;
-if (typeof packageName !== "string" || !packageName.startsWith("gh-")) {
-    throw new Error("package.json name must be a gh-* extension name.");
-}
-
 const platform = readOption("platform") ?? osNames.get(process.platform);
-const architecture = readOption("arch") ?? architectureNames.get(process.arch);
-const nodeExecutable = readOption("node-executable");
 
-if (
-    !platform ||
-    ![
-        "darwin",
-        "linux",
-        "windows",
-    ].includes(platform)
-) {
-    throw new Error(`Unsupported extension asset platform: ${platform}`);
-}
-
-if (
-    !architecture ||
-    ![
-        "386",
-        "amd64",
-        "arm64",
-    ].includes(architecture)
-) {
+if (typeof platform !== "string" || !supportedPlatforms.has(platform)) {
     throw new Error(
-        `Unsupported extension asset architecture: ${architecture}`
+        `Unsupported extension asset platform: ${String(platform)}`
     );
 }
 
-const temporaryDirectory = join(repositoryRoot, "temp", "sea");
-const distributionDirectory = join(repositoryRoot, "dist");
-const entrypointPath = join(temporaryDirectory, "entrypoint.ts");
-const bundlePath = join(temporaryDirectory, `${packageName}.mjs`);
-const seaConfigPath = join(temporaryDirectory, "sea-config.json");
+const architecture = readOption("arch") ?? architectureNames.get(process.arch);
+if (
+    typeof architecture !== "string" ||
+    !supportedArchitectures.has(architecture)
+) {
+    throw new Error(
+        `Unsupported extension asset architecture: ${String(architecture)}`
+    );
+}
+
+const nodeExecutable = readOption("node-executable");
+const temporaryDirectory = nodePath.join(repositoryRoot, "temp", "sea");
+const distributionDirectory = nodePath.join(repositoryRoot, "dist");
+const entrypointPath = nodePath.join(temporaryDirectory, "entrypoint.ts");
+const bundlePath = nodePath.join(temporaryDirectory, `${packageName}.mjs`);
+const seaConfigPath = nodePath.join(temporaryDirectory, "sea-config.json");
 const outputFileName = `${packageName}-${platform}-${architecture}${
     platform === "windows" ? ".exe" : ""
 }`;
-const outputPath = join(distributionDirectory, outputFileName);
+const outputPath = nodePath.join(distributionDirectory, outputFileName);
 
 await rm(temporaryDirectory, { force: true, recursive: true });
 await mkdir(temporaryDirectory, { recursive: true });
@@ -141,6 +170,17 @@ await build({
     target: "node22.18",
 });
 
+/**
+ * @type {{
+ *     disableExperimentalSEAWarning: boolean;
+ *     executable?: string;
+ *     execArgvExtension: string;
+ *     main: string;
+ *     mainFormat: string;
+ *     output: string;
+ *     useCodeCache: boolean;
+ * }}
+ */
 const seaConfig = {
     disableExperimentalSEAWarning: true,
     execArgvExtension: "env",
@@ -150,8 +190,8 @@ const seaConfig = {
     useCodeCache: false,
 };
 
-if (nodeExecutable) {
-    seaConfig.executable = resolve(repositoryRoot, nodeExecutable);
+if (nodeExecutable !== undefined) {
+    seaConfig.executable = nodePath.resolve(repositoryRoot, nodeExecutable);
 }
 
 await writeFile(

@@ -600,17 +600,20 @@ function parseArgument(
         return { consumesNextToken: false, key, value: true };
     }
 
+    if (hasInlineValue) {
+        return {
+            consumesNextToken: false,
+            key,
+            value: optionText.slice(separatorIndex + 1),
+        };
+    }
+
     const hasSeparateValue =
         nextToken !== undefined && !nextToken.startsWith("--");
-    const value = hasInlineValue
-        ? optionText.slice(separatorIndex + 1)
-        : hasSeparateValue
-          ? nextToken
-          : "";
     return {
-        consumesNextToken: !hasInlineValue && hasSeparateValue,
+        consumesNextToken: hasSeparateValue,
         key,
-        value,
+        value: hasSeparateValue ? nextToken : "",
     };
 }
 

@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import * as nodePath from "node:path";
 
 import type {
     DeleteResult,
@@ -7,10 +9,31 @@ import type {
     WorkflowRun,
 } from "./cli-types.ts";
 
+type FileExistenceCheck = (path: string) => boolean;
+
 type ListRunsProgressCallback = (
     fetchedInStatus: number,
     detail: string
 ) => void;
+
+const GH_EXECUTABLE_PATHS: Readonly<Record<string, readonly string[]>> = {
+    darwin: [
+        "/opt/homebrew/bin/gh",
+        "/usr/local/bin/gh",
+        "/usr/bin/gh",
+    ],
+    freebsd: ["/usr/local/bin/gh", "/usr/bin/gh"],
+    linux: [
+        "/usr/bin/gh",
+        "/usr/local/bin/gh",
+        "/snap/bin/gh",
+    ],
+    openbsd: ["/usr/local/bin/gh", "/usr/bin/gh"],
+    win32: [
+        String.raw`C:\Program Files\GitHub CLI\gh.exe`,
+        String.raw`C:\Program Files (x86)\GitHub CLI\gh.exe`,
+    ],
+};
 
 /** Delete one workflow run, retrying transient GitHub API failures. */
 export function deleteRunWithRetry(
@@ -193,6 +216,25 @@ export function resolveAuthenticatedLogin(): string | undefined {
     return login.length > 0 ? login : undefined;
 }
 
+/** Resolve GitHub CLI without executing a command through PATH search. */
+export function resolveGhExecutablePath(
+    platform: string = process.platform,
+    configuredPath: string | undefined = process.env["GH_PATH"],
+    isExistingFile: FileExistenceCheck = existsSync
+): string | undefined {
+    if (
+        typeof configuredPath === "string" &&
+        nodePath.isAbsolute(configuredPath) &&
+        isExistingFile(configuredPath)
+    ) {
+        return configuredPath;
+    }
+
+    return GH_EXECUTABLE_PATHS[platform]?.find((candidate) =>
+        isExistingFile(candidate)
+    );
+}
+
 /** Resolve an explicit repository or infer one from the current directory. */
 export function resolveRepo(
     optionRepo: string | undefined
@@ -220,7 +262,16 @@ export function resolveRepo(
 
 /** Invoke the authenticated GitHub CLI and capture its result. */
 export function runGh(args: readonly string[]): GhResponse {
-    const result = spawnSync("gh", [...args], {
+    const executablePath = resolveGhExecutablePath();
+    if (executablePath === undefined) {
+        return {
+            status: 1,
+            stderr: "Unable to locate the GitHub CLI in a trusted system location. Set GH_PATH to its absolute executable path.",
+            stdout: "",
+        };
+    }
+
+    const result = spawnSync(executablePath, [...args], {
         encoding: "utf8",
         stdio: "pipe",
     });
