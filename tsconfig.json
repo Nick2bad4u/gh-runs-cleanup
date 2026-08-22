@@ -9,6 +9,7 @@
         "declaration": false,
         "declarationMap": false,
         "diagnostics": false,
+        "erasableSyntaxOnly": true,
         "esModuleInterop": true,
         "exactOptionalPropertyTypes": true,
         "forceConsistentCasingInFileNames": true,
@@ -45,7 +46,7 @@
         "resolveJsonModule": true,
         "resolvePackageJsonExports": true,
         "resolvePackageJsonImports": true,
-        "rewriteRelativeImportExtensions": false,
+        "rewriteRelativeImportExtensions": true,
         "rootDir": ".",
         "skipLibCheck": true,
         "sourceMap": true,
@@ -71,7 +72,8 @@
     ],
     "include": [
         "src/**/*.ts",
-        "test/**/*.ts"
+        "test/**/*.ts",
+        "vitest.config.ts"
     ],
     "watchOptions": {
         "excludeDirectories": [

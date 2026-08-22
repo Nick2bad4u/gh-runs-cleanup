@@ -1,90 +1,87 @@
-import js from "@eslint/js";
-import globals from "globals";
-import tseslint from "typescript-eslint";
-
 import { createConfig } from "eslint-config-nick2bad4u";
 
-const codeFiles = ["**/*.{js,mjs,cjs,ts,mts,cts,tsx}"];
-const sharedConfig = createConfig();
-const sharedRulesOff = Object.fromEntries(
-    sharedConfig.flatMap((config) =>
-        Object.keys(config.rules ?? {}).map((ruleName) => [ruleName, "off"])
-    )
-);
-
-export default [
+/** @type {import("eslint").Linter.Config[]} */
+const config = [
+    ...createConfig({
+        plugins: {
+            "docusaurus-2": false,
+            typefest: false,
+        },
+        tsconfigPaths: ["./tsconfig.json"],
+    }),
     {
-        ignores: [
-            "dist/**",
-            "node_modules/**",
-            "temp/**",
-            ".cache/**",
-        ],
-    },
-    ...sharedConfig,
-    {
-        name: "Preserve the repository's established ESLint rule contract",
-        rules: sharedRulesOff,
-    },
-    {
-        ...js.configs.recommended,
-        files: codeFiles,
-    },
-    ...tseslint.configs.strict.map((config) => ({
-        ...config,
-        files: codeFiles,
-    })),
-    ...tseslint.configs.strictTypeChecked.map((config) => ({
-        ...config,
-        files: codeFiles,
-    })),
-    {
-        files: ["**/*.{ts,mts,cts,tsx}"],
-        languageOptions: {
-            parserOptions: {
-                projectService: true,
-                tsconfigRootDir: import.meta.dirname,
-            },
+        name: "Repository policy exceptions",
+        rules: {
+            "repo-compliance/require-secret-scanning-config": "off",
         },
     },
     {
-        files: ["**/*.{ts,mts,cts,tsx}"],
+        files: ["**/*.ts"],
+        name: "Require native Node TypeScript import extensions",
         rules: {
-            "@typescript-eslint/consistent-type-definitions": ["error", "type"],
-            "@typescript-eslint/no-confusing-void-expression": "error",
-            "@typescript-eslint/no-unnecessary-condition": "error",
-            "@typescript-eslint/no-unnecessary-template-expression": "error",
-            "@typescript-eslint/restrict-template-expressions": [
-                "error",
-                {
-                    allowAny: false,
-                    allowBoolean: true,
-                    allowNullish: false,
-                    allowNumber: true,
-                    allowRegExp: false,
-                },
-            ],
+            "import-x/extensions": "off",
+        },
+    },
+    {
+        files: ["**/*.html"],
+        name: "Defer self-closing tag spacing to Prettier",
+        rules: {
+            "@html-eslint/no-extra-spacing-tags": "off",
+        },
+    },
+    {
+        files: ["src/**/*.ts"],
+        name: "Allow the CLI runtime to write user-facing output",
+        rules: {
+            "no-console": "off",
+            "unicorn/prefer-error-is-error": "off",
+        },
+    },
+    {
+        files: ["src/cli-styling.ts"],
+        name: "Allow terminal behavior to honor standard environment variables",
+        rules: {
+            "n/no-process-env": "off",
+        },
+    },
+    {
+        files: ["src/cli-output.ts"],
+        name: "Keep ISO timestamp parsing compatible with supported Node LTS releases",
+        rules: {
+            "canonical/no-use-extend-native": "off",
+            "unicorn/prefer-temporal": "off",
+        },
+    },
+    {
+        files: ["src/cli-gh.ts"],
+        name: "Allow the synchronous GitHub CLI boundary",
+        rules: {
+            "n/no-sync": "off",
+            "sonarjs/no-os-command-from-path": "off",
+        },
+    },
+    {
+        files: ["src/cli.ts"],
+        name: "Allow the executable module to export its testable entry point",
+        rules: {
+            "unicorn/no-exports-in-scripts": "off",
         },
     },
     {
         files: ["test/**/*.ts"],
-        rules: { "@typescript-eslint/no-floating-promises": "off" },
-    },
-    {
-        ...tseslint.configs.disableTypeChecked,
-        files: ["**/*.{js,mjs,cjs}"],
-    },
-    {
-        files: ["**/*.{js,mjs,cjs}"],
-        languageOptions: {
-            ecmaVersion: "latest",
-            globals: {
-                ...globals.node,
-            },
-            sourceType: "module",
-        },
+        name: "Keep deterministic test fixtures and cleanup readable",
         rules: {
-            "no-console": "off",
+            "canonical/no-barrel-import": "off",
+            "sonarjs/no-undefined-assignment": "off",
+            "test-signal/no-duplicate-assertions": "off",
+            "test-signal/no-mock-call-only-tests": "off",
+            "test-signal/require-negative-path": "off",
+            "unicorn/prefer-temporal": "off",
+            "vitest/no-hooks": "off",
+            "vitest/prefer-import-in-mock": "off",
+            "vitest/require-top-level-describe": "off",
         },
     },
 ];
+
+export default config;

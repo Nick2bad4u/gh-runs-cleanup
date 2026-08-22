@@ -50,7 +50,35 @@ function run(command, args) {
     }
 
     if (result.status !== 0) {
-        process.exit(result.status ?? 1);
+        throw new Error(
+            `${command} exited with status ${result.status ?? "unknown"}.`
+        );
+    }
+}
+
+function smokeTestExecutable(executablePath, expectedHeading) {
+    const result = spawnSync(executablePath, ["--help"], {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+    });
+
+    if (result.error) {
+        throw result.error;
+    }
+
+    if (result.status !== 0) {
+        throw new Error(
+            `${executablePath} --help exited with status ${result.status ?? "unknown"}: ${result.stderr}`
+        );
+    }
+
+    const headingCount = result.stdout
+        .split(/\r?\n/u)
+        .filter((line) => line === expectedHeading).length;
+    if (headingCount !== 1) {
+        throw new Error(
+            `Expected one ${expectedHeading} help heading, found ${headingCount}.`
+        );
     }
 }
 
@@ -101,11 +129,7 @@ await rm(temporaryDirectory, { force: true, recursive: true });
 await mkdir(temporaryDirectory, { recursive: true });
 await mkdir(distributionDirectory, { recursive: true });
 
-await writeFile(
-    entrypointPath,
-    'import { runCli } from "../../src/cli.ts";\n\nrunCli();\n',
-    "utf8"
-);
+await writeFile(entrypointPath, 'import "../../src/cli.ts";\n', "utf8");
 
 await build({
     bundle: true,
@@ -114,7 +138,7 @@ await build({
     logLevel: "info",
     outfile: bundlePath,
     platform: "node",
-    target: "node25",
+    target: "node22.18",
 });
 
 const seaConfig = {
@@ -143,3 +167,11 @@ if (platform !== "windows") {
 }
 
 console.log(`Built ${outputFileName}`);
+
+if (
+    platform === osNames.get(process.platform) &&
+    architecture === architectureNames.get(process.arch)
+) {
+    smokeTestExecutable(outputPath, packageName);
+    console.log(`Smoke-tested ${outputFileName}`);
+}

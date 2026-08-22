@@ -1,4 +1,4 @@
-# .gitattributes file for Uptime Watcher
+# .gitattributes file for gh-runs-cleanup
 # This file defines attributes for files and directories in the repository
 # See: https://git-scm.com/docs/gitattributes
 
@@ -138,10 +138,9 @@ package-lock.json linguist-generated=true
 
 # Mark documentation
 *.md linguist-documentation=true
-/docs/ linguist-documentation=true
+/docs/** linguist-documentation=true
 
 # Mark configuration files
-*.config.* linguist-language=JSON
 .*rc linguist-language=JSON
 *.toml linguist-language=TOML
 *.yml linguist-language=YAML
@@ -153,13 +152,6 @@ package-lock.json linguist-generated=true
 *.json diff=json
 *.css diff=css
 *.html diff=html
-
-# === MERGE SETTINGS ===
-# Files that should not be merged automatically
-package-lock.json merge=ours
-yarn.lock merge=ours
-pnpm-lock.yaml merge=ours
-CHANGELOG.md merge=union
 
 # === EXPORT IGNORE ===
 # Files to exclude from archive exports
