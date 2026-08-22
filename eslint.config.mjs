@@ -85,6 +85,13 @@ const config = [
         },
     },
     {
+        files: ["scripts/format-changelog.mjs"],
+        name: "Allow sequential formatting passes to reach a fixed point",
+        rules: {
+            "no-await-in-loop": "off",
+        },
+    },
+    {
         files: ["test/**/*.ts"],
         name: "Keep deterministic test fixtures and cleanup readable",
         rules: {

@@ -38,7 +38,7 @@
     "scripts": {
         "build": "tsc -p tsconfig.json",
         "build:assets": "node scripts/build-gh-extension-assets.mjs",
-        "changelog:format": "prettier CHANGELOG.md --write",
+        "changelog:format": "node scripts/format-changelog.mjs",
         "changelog:generate": "git cliff --config node_modules/gitcliff-config-nick2bad4u/cliff.toml --github-repo Nick2bad4u/gh-runs-cleanup --output CHANGELOG.md && npm run changelog:normalize && npm run changelog:format",
         "changelog:normalize": "node scripts/normalize-changelog.mjs",
         "changelog:preview": "git cliff --config node_modules/gitcliff-config-nick2bad4u/cliff.toml --github-repo Nick2bad4u/gh-runs-cleanup --unreleased",

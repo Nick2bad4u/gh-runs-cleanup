@@ -13,8 +13,8 @@ describe(normalizeDependabotPrefixes, () => {
 
         expect(normalizeDependabotPrefixes(input)).toBe(
             [
-                String.raw`\[dependabot\](deps): Update one dependency`,
-                String.raw`  \[dependabot\]\[all\](deps): Update a dependency group`,
+                "&#91;dependabot&#93;(deps): Update one dependency",
+                "  &#91;dependabot&#93;&#91;all&#93;(deps): Update a dependency group",
             ].join("\n")
         );
     });
@@ -26,7 +26,7 @@ describe(normalizeDependabotPrefixes, () => {
             "feat: regular entry",
             "[dependabot](): empty scope",
             "[dependabot][all(deps): malformed qualifier",
-            String.raw`\[dependabot\](deps): already normalized`,
+            "&#91;dependabot&#93;(deps): already normalized",
         ].join("\n");
 
         expect(normalizeDependabotPrefixes(input)).toBe(input);
@@ -40,7 +40,7 @@ describe(normalizeDependabotPrefixes, () => {
 
         expect(normalized).toBe(
             [
-                String.raw`\[dependabot\]\[npm\](deps): Update`,
+                "&#91;dependabot&#93;&#91;npm&#93;(deps): Update",
                 "Next line",
                 "",
             ].join("\r\n")

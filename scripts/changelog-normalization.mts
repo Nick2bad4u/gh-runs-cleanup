@@ -40,8 +40,8 @@ function normalizeDependabotLine(line: string): string {
 
     const prefix = content.slice(0, closingParenthesis + 1);
     const escapedPrefix = prefix
-        .replaceAll("[", String.raw`\[`)
-        .replaceAll("]", String.raw`\]`);
+        .replaceAll("[", "&#91;")
+        .replaceAll("]", "&#93;");
 
     return `${indentation}${escapedPrefix}${content.slice(closingParenthesis + 1)}`;
 }
