@@ -55,43 +55,43 @@
 - [Commits](https://github.com/softprops/action-gh-release/compare/b4309332981a82ec1c5618f44dd2e27cc8bfbfda...718ea10b132b3b2eba29c1007bb80653f286566b)
   \[dependabot\]\[all\](deps): [dependency] Update dependency group
   - Bumps the dependabot-all group with 35 updates:
-  - | Package | From | To |
-    | --- | --- | --- |
-    | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node) | `25.9.3` | `26.0.1` |
-    | [eslint](https://github.com/eslint/eslint) | `10.4.1` | `10.6.0` |
-    | [globals](https://github.com/sindresorhus/globals) | `17.6.0` | `17.7.0` |
-    | [prettier](https://github.com/prettier/prettier) | `3.8.3` | `3.9.1` |
-    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint) | `8.61.0` | `8.62.0` |
-    | [@augment-vir/assert](https://github.com/electrovir/augment-vir) | `31.73.0` | `31.73.2` |
-    | [@augment-vir/common](https://github.com/electrovir/augment-vir) | `31.73.0` | `31.73.2` |
-    | [@augment-vir/core](https://github.com/electrovir/augment-vir) | `31.73.0` | `31.73.2` |
-    | [@date-vir/duration](https://github.com/electrovir/date-vir) | `8.3.2` | `8.6.1` |
-    | [@reteps/dockerfmt](https://github.com/reteps/dockerfmt/tree/HEAD/js) | `0.5.2` | `0.5.4` |
-    | [@types/estree](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/estree) | `1.0.8` | `1.0.9` |
-    | [@types/luxon](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/luxon) | `3.7.1` | `3.7.2` |
-    | [@typescript-eslint/eslint-plugin](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/eslint-plugin) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/parser](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/parser) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/project-service](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/project-service) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/scope-manager](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/scope-manager) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/tsconfig-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/tsconfig-utils) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/type-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/type-utils) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/types](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/types) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/typescript-estree](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-estree) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/utils) | `8.61.0` | `8.62.0` |
-    | [@typescript-eslint/visitor-keys](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/visitor-keys) | `8.61.0` | `8.62.0` |
-    | [acorn](https://github.com/acornjs/acorn) | `8.16.0` | `8.17.0` |
-    | [brace-expansion](https://github.com/juliangruber/brace-expansion) | `5.0.5` | `5.0.7` |
-    | [comment-parser](https://github.com/yavorskiy/comment-parser) | `1.4.6` | `1.4.7` |
-    | [deepcopy-esm](https://github.com/electrovir/deepcopy-esm) | `2.1.1` | `2.1.2` |
-    | [expect-type](https://github.com/mmkal/expect-type) | `1.3.0` | `1.4.0` |
-    | [proxy-vir](https://github.com/electrovir/proxy-vir) | `2.0.2` | `2.0.3` |
-    | [semver](https://github.com/npm/node-semver) | `7.7.4` | `7.8.5` |
-    | [sort-package-json](https://github.com/keithamus/sort-package-json) | `3.6.1` | `3.7.1` |
-    | [sql-formatter](https://github.com/sql-formatter-org/sql-formatter) | `15.7.3` | `15.8.2` |
-    | [tinyglobby](https://github.com/SuperchupuDev/tinyglobby) | `0.2.16` | `0.2.17` |
-    | [type-fest](https://github.com/sindresorhus/type-fest) | `5.6.0` | `5.7.0` |
-    | [typed-event-target](https://github.com/electrovir/typed-event-target) | `4.3.0` | `4.3.1` |
-    | [undici-types](https://github.com/nodejs/undici) | `7.24.6` | `8.3.0` |
+  - | Package                                                                                                                             | From      | To        |
+    | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
+    | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node)                                              | `25.9.3`  | `26.0.1`  |
+    | [eslint](https://github.com/eslint/eslint)                                                                                          | `10.4.1`  | `10.6.0`  |
+    | [globals](https://github.com/sindresorhus/globals)                                                                                  | `17.6.0`  | `17.7.0`  |
+    | [prettier](https://github.com/prettier/prettier)                                                                                    | `3.8.3`   | `3.9.1`   |
+    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint)                    | `8.61.0`  | `8.62.0`  |
+    | [@augment-vir/assert](https://github.com/electrovir/augment-vir)                                                                    | `31.73.0` | `31.73.2` |
+    | [@augment-vir/common](https://github.com/electrovir/augment-vir)                                                                    | `31.73.0` | `31.73.2` |
+    | [@augment-vir/core](https://github.com/electrovir/augment-vir)                                                                      | `31.73.0` | `31.73.2` |
+    | [@date-vir/duration](https://github.com/electrovir/date-vir)                                                                        | `8.3.2`   | `8.6.1`   |
+    | [@reteps/dockerfmt](https://github.com/reteps/dockerfmt/tree/HEAD/js)                                                               | `0.5.2`   | `0.5.4`   |
+    | [@types/estree](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/estree)                                          | `1.0.8`   | `1.0.9`   |
+    | [@types/luxon](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/luxon)                                            | `3.7.1`   | `3.7.2`   |
+    | [@typescript-eslint/eslint-plugin](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/eslint-plugin)         | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/parser](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/parser)                       | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/project-service](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/project-service)     | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/scope-manager](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/scope-manager)         | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/tsconfig-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/tsconfig-utils)       | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/type-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/type-utils)               | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/types](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/types)                         | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/typescript-estree](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-estree) | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/utils)                         | `8.61.0`  | `8.62.0`  |
+    | [@typescript-eslint/visitor-keys](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/visitor-keys)           | `8.61.0`  | `8.62.0`  |
+    | [acorn](https://github.com/acornjs/acorn)                                                                                           | `8.16.0`  | `8.17.0`  |
+    | [brace-expansion](https://github.com/juliangruber/brace-expansion)                                                                  | `5.0.5`   | `5.0.7`   |
+    | [comment-parser](https://github.com/yavorskiy/comment-parser)                                                                       | `1.4.6`   | `1.4.7`   |
+    | [deepcopy-esm](https://github.com/electrovir/deepcopy-esm)                                                                          | `2.1.1`   | `2.1.2`   |
+    | [expect-type](https://github.com/mmkal/expect-type)                                                                                 | `1.3.0`   | `1.4.0`   |
+    | [proxy-vir](https://github.com/electrovir/proxy-vir)                                                                                | `2.0.2`   | `2.0.3`   |
+    | [semver](https://github.com/npm/node-semver)                                                                                        | `7.7.4`   | `7.8.5`   |
+    | [sort-package-json](https://github.com/keithamus/sort-package-json)                                                                 | `3.6.1`   | `3.7.1`   |
+    | [sql-formatter](https://github.com/sql-formatter-org/sql-formatter)                                                                 | `15.7.3`  | `15.8.2`  |
+    | [tinyglobby](https://github.com/SuperchupuDev/tinyglobby)                                                                           | `0.2.16`  | `0.2.17`  |
+    | [type-fest](https://github.com/sindresorhus/type-fest)                                                                              | `5.6.0`   | `5.7.0`   |
+    | [typed-event-target](https://github.com/electrovir/typed-event-target)                                                              | `4.3.0`   | `4.3.1`   |
+    | [undici-types](https://github.com/nodejs/undici)                                                                                    | `7.24.6`  | `8.3.0`   |
   - Updates `@types/node` from 25.9.3 to 26.0.1
 - [Release notes](https://github.com/DefinitelyTyped/DefinitelyTyped/releases)
 - [Commits](https://github.com/DefinitelyTyped/DefinitelyTyped/commits/HEAD/types/node)
@@ -421,14 +421,14 @@ updated-dependencies:
 
 - [`c3c1620`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/c3c162005f25959e19f92edde293da25b8e7bd22 "Diff: 6 files, +19920 | -14540") — _(deps)_ [dependency] Update dependency group&nbsp;<sub><em>(6&nbsp;files,&nbsp;+19920,&nbsp;-14540)</em></sub>
   - Bumps the dependabot-all group with 6 updates:
-  - | Package | From | To |
-    | --- | --- | --- |
+  - | Package                                                                       | From     | To       |
+    | ----------------------------------------------------------------------------- | -------- | -------- |
     | [step-security/harden-runner](https://github.com/step-security/harden-runner) | `2.19.4` | `2.20.0` |
-    | [actions/checkout](https://github.com/actions/checkout) | `7.0.0` | `7.0.1` |
-    | [actions/setup-node](https://github.com/actions/setup-node) | `6.4.0` | `7.0.0` |
-    | [github/codeql-action/init](https://github.com/github/codeql-action) | `4.36.2` | `4.37.3` |
-    | [github/codeql-action/analyze](https://github.com/github/codeql-action) | `4.36.2` | `4.37.3` |
-    | [softprops/action-gh-release](https://github.com/softprops/action-gh-release) | `3.0.1` | `3.0.2` |
+    | [actions/checkout](https://github.com/actions/checkout)                       | `7.0.0`  | `7.0.1`  |
+    | [actions/setup-node](https://github.com/actions/setup-node)                   | `6.4.0`  | `7.0.0`  |
+    | [github/codeql-action/init](https://github.com/github/codeql-action)          | `4.36.2` | `4.37.3` |
+    | [github/codeql-action/analyze](https://github.com/github/codeql-action)       | `4.36.2` | `4.37.3` |
+    | [softprops/action-gh-release](https://github.com/softprops/action-gh-release) | `3.0.1`  | `3.0.2`  |
   - Updates `step-security/harden-runner` from 2.19.4 to 2.20.0
 - [Release notes](https://github.com/step-security/harden-runner/releases)
 - [Commits](https://github.com/step-security/harden-runner/compare/9af89fc71515a100421586dfdb3dc9c984fbf411...bf7454d06d71f1098171f2acdf0cd4708d7b5920)
@@ -453,21 +453,21 @@ updated-dependencies:
 - [Commits](https://github.com/softprops/action-gh-release/compare/718ea10b132b3b2eba29c1007bb80653f286566b...3d0d9888cb7fd7b750713d6e236d1fcb99157228)
   \[dependabot\]\[dev\]\[all\](deps-dev): [dependency] Update dependency group
   - Bumps the dependabot-all group with 13 updates:
-  - | Package | From | To |
-    | --- | --- | --- |
-    | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node) | `26.1.1` | `26.1.2` |
-    | [eslint](https://github.com/eslint/eslint) | `10.7.0` | `10.8.0` |
-    | [eslint-config-nick2bad4u](https://github.com/Nick2bad4u/eslint-config-nick2bad4u) | `5.0.0` | `11.0.1` |
-    | [gitcliff-config-nick2bad4u](https://github.com/Nick2bad4u/gitcliff-config-nick2bad4u) | `1.3.0` | `1.4.0` |
-    | [globals](https://github.com/sindresorhus/globals) | `17.7.0` | `17.8.0` |
-    | [jscpd](https://github.com/kucherenko/jscpd/tree/HEAD/rust/jscpd) | `5.0.12` | `5.0.14` |
-    | [ncu-config-nick2bad4u](https://github.com/Nick2bad4u/ncu-config-nick2bad4u) | `0.2.0` | `0.2.1` |
-    | [npm-check-updates](https://github.com/raineorshine/npm-check-updates) | `22.2.9` | `23.0.0` |
-    | [prettier](https://github.com/prettier/prettier) | `3.9.5` | `3.9.6` |
-    | [secretlint](https://github.com/secretlint/secretlint) | `13.0.2` | `13.0.4` |
-    | [stylelint](https://github.com/stylelint/stylelint) | `17.14.0` | `17.14.1` |
-    | [typescript](https://github.com/microsoft/TypeScript) | `6.0.3` | `7.0.2` |
-    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint) | `8.63.0` | `8.65.0` |
+  - | Package                                                                                                          | From      | To        |
+    | ---------------------------------------------------------------------------------------------------------------- | --------- | --------- |
+    | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node)                           | `26.1.1`  | `26.1.2`  |
+    | [eslint](https://github.com/eslint/eslint)                                                                       | `10.7.0`  | `10.8.0`  |
+    | [eslint-config-nick2bad4u](https://github.com/Nick2bad4u/eslint-config-nick2bad4u)                               | `5.0.0`   | `11.0.1`  |
+    | [gitcliff-config-nick2bad4u](https://github.com/Nick2bad4u/gitcliff-config-nick2bad4u)                           | `1.3.0`   | `1.4.0`   |
+    | [globals](https://github.com/sindresorhus/globals)                                                               | `17.7.0`  | `17.8.0`  |
+    | [jscpd](https://github.com/kucherenko/jscpd/tree/HEAD/rust/jscpd)                                                | `5.0.12`  | `5.0.14`  |
+    | [ncu-config-nick2bad4u](https://github.com/Nick2bad4u/ncu-config-nick2bad4u)                                     | `0.2.0`   | `0.2.1`   |
+    | [npm-check-updates](https://github.com/raineorshine/npm-check-updates)                                           | `22.2.9`  | `23.0.0`  |
+    | [prettier](https://github.com/prettier/prettier)                                                                 | `3.9.5`   | `3.9.6`   |
+    | [secretlint](https://github.com/secretlint/secretlint)                                                           | `13.0.2`  | `13.0.4`  |
+    | [stylelint](https://github.com/stylelint/stylelint)                                                              | `17.14.0` | `17.14.1` |
+    | [typescript](https://github.com/microsoft/TypeScript)                                                            | `6.0.3`   | `7.0.2`   |
+    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint) | `8.63.0`  | `8.65.0`  |
   - Updates `@types/node` from 26.1.1 to 26.1.2
 - [Release notes](https://github.com/DefinitelyTyped/DefinitelyTyped/releases)
 - [Commits](https://github.com/DefinitelyTyped/DefinitelyTyped/commits/HEAD/types/node)
@@ -822,35 +822,35 @@ updated-dependencies:
 
 - [`6306296`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/6306296ea0d55d66f279c4b555b908dfc2f18522 "Diff: 7 files, +192 | -146") — _(deps)_ [dependency] Update dependency group&nbsp;<sub><em>(7&nbsp;files,&nbsp;+192,&nbsp;-146)</em></sub>
   - Bumps the dependabot-all group with 27 updates:
-  - | Package | From | To |
-    | --- | --- | --- |
-    | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node) | `25.6.0` | `25.9.1` |
-    | [eslint](https://github.com/eslint/eslint) | `10.2.1` | `10.4.1` |
-    | [globals](https://github.com/sindresorhus/globals) | `17.5.0` | `17.6.0` |
-    | [prettier-plugin-jsdoc](https://github.com/hosseinmd/prettier-plugin-jsdoc) | `1.8.0` | `1.8.1` |
-    | [prettier-plugin-multiline-arrays](https://github.com/electrovir/prettier-plugin-multiline-arrays) | `4.1.7` | `4.1.8` |
-    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint) | `8.59.1` | `8.60.0` |
-    | [@augment-vir/assert](https://github.com/electrovir/augment-vir) | `31.68.4` | `31.71.3` |
-    | [@augment-vir/common](https://github.com/electrovir/augment-vir) | `31.68.4` | `31.71.3` |
-    | [@augment-vir/core](https://github.com/electrovir/augment-vir) | `31.68.4` | `31.71.3` |
-    | [@eslint/config-helpers](https://github.com/eslint/rewrite/tree/HEAD/packages/config-helpers) | `0.5.5` | `0.6.0` |
-    | [@eslint/plugin-kit](https://github.com/eslint/rewrite/tree/HEAD/packages/plugin-kit) | `0.7.1` | `0.7.2` |
-    | [@types/estree](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/estree) | `1.0.8` | `1.0.9` |
-    | [@typescript-eslint/eslint-plugin](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/eslint-plugin) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/parser](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/parser) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/project-service](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/project-service) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/scope-manager](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/scope-manager) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/tsconfig-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/tsconfig-utils) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/type-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/type-utils) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/types](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/types) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/typescript-estree](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-estree) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/utils) | `8.59.1` | `8.60.0` |
-    | [@typescript-eslint/visitor-keys](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/visitor-keys) | `8.59.1` | `8.60.0` |
-    | [brace-expansion](https://github.com/juliangruber/brace-expansion) | `5.0.5` | `5.0.6` |
-    | [comment-parser](https://github.com/yavorskiy/comment-parser) | `1.4.6` | `1.4.7` |
-    | [semver](https://github.com/npm/node-semver) | `7.7.4` | `7.8.1` |
-    | [sql-formatter](https://github.com/sql-formatter-org/sql-formatter) | `15.7.3` | `15.8.0` |
-    | [undici-types](https://github.com/nodejs/undici) | `7.19.2` | `7.24.6` |
+  - | Package                                                                                                                             | From      | To        |
+    | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
+    | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node)                                              | `25.6.0`  | `25.9.1`  |
+    | [eslint](https://github.com/eslint/eslint)                                                                                          | `10.2.1`  | `10.4.1`  |
+    | [globals](https://github.com/sindresorhus/globals)                                                                                  | `17.5.0`  | `17.6.0`  |
+    | [prettier-plugin-jsdoc](https://github.com/hosseinmd/prettier-plugin-jsdoc)                                                         | `1.8.0`   | `1.8.1`   |
+    | [prettier-plugin-multiline-arrays](https://github.com/electrovir/prettier-plugin-multiline-arrays)                                  | `4.1.7`   | `4.1.8`   |
+    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint)                    | `8.59.1`  | `8.60.0`  |
+    | [@augment-vir/assert](https://github.com/electrovir/augment-vir)                                                                    | `31.68.4` | `31.71.3` |
+    | [@augment-vir/common](https://github.com/electrovir/augment-vir)                                                                    | `31.68.4` | `31.71.3` |
+    | [@augment-vir/core](https://github.com/electrovir/augment-vir)                                                                      | `31.68.4` | `31.71.3` |
+    | [@eslint/config-helpers](https://github.com/eslint/rewrite/tree/HEAD/packages/config-helpers)                                       | `0.5.5`   | `0.6.0`   |
+    | [@eslint/plugin-kit](https://github.com/eslint/rewrite/tree/HEAD/packages/plugin-kit)                                               | `0.7.1`   | `0.7.2`   |
+    | [@types/estree](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/estree)                                          | `1.0.8`   | `1.0.9`   |
+    | [@typescript-eslint/eslint-plugin](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/eslint-plugin)         | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/parser](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/parser)                       | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/project-service](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/project-service)     | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/scope-manager](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/scope-manager)         | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/tsconfig-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/tsconfig-utils)       | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/type-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/type-utils)               | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/types](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/types)                         | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/typescript-estree](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-estree) | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/utils)                         | `8.59.1`  | `8.60.0`  |
+    | [@typescript-eslint/visitor-keys](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/visitor-keys)           | `8.59.1`  | `8.60.0`  |
+    | [brace-expansion](https://github.com/juliangruber/brace-expansion)                                                                  | `5.0.5`   | `5.0.6`   |
+    | [comment-parser](https://github.com/yavorskiy/comment-parser)                                                                       | `1.4.6`   | `1.4.7`   |
+    | [semver](https://github.com/npm/node-semver)                                                                                        | `7.7.4`   | `7.8.1`   |
+    | [sql-formatter](https://github.com/sql-formatter-org/sql-formatter)                                                                 | `15.7.3`  | `15.8.0`  |
+    | [undici-types](https://github.com/nodejs/undici)                                                                                    | `7.19.2`  | `7.24.6`  |
   - Updates `@types/node` from 25.6.0 to 25.9.1
 - [Release notes](https://github.com/DefinitelyTyped/DefinitelyTyped/releases)
 - [Commits](https://github.com/DefinitelyTyped/DefinitelyTyped/commits/HEAD/types/node)
@@ -1125,17 +1125,17 @@ updated-dependencies:
 
 - [`42eadc9`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/42eadc9524c4fd8868797ab4353ad593a3f60e83 "Diff: 8 files, +129 | -115") — _(deps)_ [dependency] Update dependency group&nbsp;<sub><em>(8&nbsp;files,&nbsp;+129,&nbsp;-115)</em></sub>
   - Bumps the dependabot-all group with 9 updates:
-  - | Package | From | To |
-    | --- | --- | --- |
-    | [step-security/harden-runner](https://github.com/step-security/harden-runner) | `2.14.2` | `2.19.0` |
-    | [actions/setup-node](https://github.com/actions/setup-node) | `6.3.0` | `6.4.0` |
-    | [github/codeql-action](https://github.com/github/codeql-action) | `4.32.4` | `4.35.2` |
-    | [actions/dependency-review-action](https://github.com/actions/dependency-review-action) | `4.8.3` | `4.9.0` |
-    | [actions/configure-pages](https://github.com/actions/configure-pages) | `5` | `6` |
-    | [actions/upload-pages-artifact](https://github.com/actions/upload-pages-artifact) | `3` | `5` |
-    | [actions/deploy-pages](https://github.com/actions/deploy-pages) | `4` | `5` |
-    | [actions/upload-artifact](https://github.com/actions/upload-artifact) | `4` | `7` |
-    | [softprops/action-gh-release](https://github.com/softprops/action-gh-release) | `2.6.2` | `3.0.0` |
+  - | Package                                                                                 | From     | To       |
+    | --------------------------------------------------------------------------------------- | -------- | -------- |
+    | [step-security/harden-runner](https://github.com/step-security/harden-runner)           | `2.14.2` | `2.19.0` |
+    | [actions/setup-node](https://github.com/actions/setup-node)                             | `6.3.0`  | `6.4.0`  |
+    | [github/codeql-action](https://github.com/github/codeql-action)                         | `4.32.4` | `4.35.2` |
+    | [actions/dependency-review-action](https://github.com/actions/dependency-review-action) | `4.8.3`  | `4.9.0`  |
+    | [actions/configure-pages](https://github.com/actions/configure-pages)                   | `5`      | `6`      |
+    | [actions/upload-pages-artifact](https://github.com/actions/upload-pages-artifact)       | `3`      | `5`      |
+    | [actions/deploy-pages](https://github.com/actions/deploy-pages)                         | `4`      | `5`      |
+    | [actions/upload-artifact](https://github.com/actions/upload-artifact)                   | `4`      | `7`      |
+    | [softprops/action-gh-release](https://github.com/softprops/action-gh-release)           | `2.6.2`  | `3.0.0`  |
   - Updates `step-security/harden-runner` from 2.14.2 to 2.19.0
 - [Release notes](https://github.com/step-security/harden-runner/releases)
 - [Commits](https://github.com/step-security/harden-runner/compare/v2.14.2...8d3c67de8e2fe68ef647c8db1e6a09f647780f40)
@@ -1167,27 +1167,27 @@ updated-dependencies:
 - [Commits](https://github.com/softprops/action-gh-release/compare/3bb12739c298aeb8a4eeaf626c5b8d85266b0e65...b4309332981a82ec1c5618f44dd2e27cc8bfbfda)
   \[dependabot\]\[all\](deps): [dependency] Update dependency group
   - Bumps the dependabot-all group with 19 updates:
-  - | Package | From | To |
-    | --- | --- | --- |
-    | [eslint](https://github.com/eslint/eslint) | `10.2.0` | `10.2.1` |
-    | [prettier-plugin-multiline-arrays](https://github.com/electrovir/prettier-plugin-multiline-arrays) | `4.1.5` | `4.1.7` |
-    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint) | `8.58.2` | `8.59.1` |
-    | [typescript](https://github.com/microsoft/TypeScript) | `6.0.2` | `6.0.3` |
-    | [@date-vir/duration](https://github.com/electrovir/date-vir) | `8.3.1` | `8.3.2` |
-    | [@humanfs/core](https://github.com/humanwhocodes/humanfs) | `0.19.1` | `0.19.2` |
-    | [@humanfs/node](https://github.com/humanwhocodes/humanfs/tree/HEAD/packages/node) | `0.16.7` | `0.16.8` |
-    | [@typescript-eslint/eslint-plugin](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/eslint-plugin) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/parser](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/parser) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/project-service](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/project-service) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/scope-manager](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/scope-manager) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/tsconfig-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/tsconfig-utils) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/type-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/type-utils) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/types](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/types) | `8.58.2` | `8.59.1` |
+  - | Package                                                                                                                             | From     | To       |
+    | ----------------------------------------------------------------------------------------------------------------------------------- | -------- | -------- |
+    | [eslint](https://github.com/eslint/eslint)                                                                                          | `10.2.0` | `10.2.1` |
+    | [prettier-plugin-multiline-arrays](https://github.com/electrovir/prettier-plugin-multiline-arrays)                                  | `4.1.5`  | `4.1.7`  |
+    | [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint)                    | `8.58.2` | `8.59.1` |
+    | [typescript](https://github.com/microsoft/TypeScript)                                                                               | `6.0.2`  | `6.0.3`  |
+    | [@date-vir/duration](https://github.com/electrovir/date-vir)                                                                        | `8.3.1`  | `8.3.2`  |
+    | [@humanfs/core](https://github.com/humanwhocodes/humanfs)                                                                           | `0.19.1` | `0.19.2` |
+    | [@humanfs/node](https://github.com/humanwhocodes/humanfs/tree/HEAD/packages/node)                                                   | `0.16.7` | `0.16.8` |
+    | [@typescript-eslint/eslint-plugin](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/eslint-plugin)         | `8.58.2` | `8.59.1` |
+    | [@typescript-eslint/parser](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/parser)                       | `8.58.2` | `8.59.1` |
+    | [@typescript-eslint/project-service](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/project-service)     | `8.58.2` | `8.59.1` |
+    | [@typescript-eslint/scope-manager](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/scope-manager)         | `8.58.2` | `8.59.1` |
+    | [@typescript-eslint/tsconfig-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/tsconfig-utils)       | `8.58.2` | `8.59.1` |
+    | [@typescript-eslint/type-utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/type-utils)               | `8.58.2` | `8.59.1` |
+    | [@typescript-eslint/types](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/types)                         | `8.58.2` | `8.59.1` |
     | [@typescript-eslint/typescript-estree](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-estree) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/utils) | `8.58.2` | `8.59.1` |
-    | [@typescript-eslint/visitor-keys](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/visitor-keys) | `8.58.2` | `8.59.1` |
-    | [ajv](https://github.com/ajv-validator/ajv) | `6.14.0` | `6.15.0` |
-    | [type-fest](https://github.com/sindresorhus/type-fest) | `5.5.0` | `5.6.0` |
+    | [@typescript-eslint/utils](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/utils)                         | `8.58.2` | `8.59.1` |
+    | [@typescript-eslint/visitor-keys](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/visitor-keys)           | `8.58.2` | `8.59.1` |
+    | [ajv](https://github.com/ajv-validator/ajv)                                                                                         | `6.14.0` | `6.15.0` |
+    | [type-fest](https://github.com/sindresorhus/type-fest)                                                                              | `5.5.0`  | `5.6.0`  |
   - Updates `eslint` from 10.2.0 to 10.2.1
 - [Release notes](https://github.com/eslint/eslint/releases)
 - [Commits](https://github.com/eslint/eslint/compare/v10.2.0...v10.2.1)
