@@ -1,8 +1,8 @@
 title = "gh-runs-cleanup shared Gitleaks configuration"
 
 [extend]
-    path = "node_modules/gitleaks-config-nick2bad4u/gitleaks.toml"
+path = "node_modules/gitleaks-config-nick2bad4u/gitleaks.toml"
 
 [[allowlists]]
-    description = "Ignore local scratch command output"
-    paths       = [ '''^temp/''' ]
+description = "Ignore local scratch command output"
+paths = ['''^temp/''']
