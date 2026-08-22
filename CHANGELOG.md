@@ -5,7 +5,7 @@
 
 ## ✨ What's Changed
 
-- <b>Commit Range: ➡️</b> [`v2.0.0...5d07642`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v2.0.0...5d076425500d0fbbdc673884df837d9993d8daf8 "View full commit range on GitHub")
+- <b>Commit Range: ➡️</b> [`v2.0.0...dffd5d0`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v2.0.0...dffd5d0a2a6ee55d2cf4a1ddf038ae3a0db67a4c "View full commit range on GitHub")
 
 ### 🛠️ Bug Fixes
 
@@ -15,13 +15,26 @@
 
 ### 📝 Documentation
 
+- [`5665ee2`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/5665ee2cb9a2833d7aaf1c222b4ff6d3e1224ae6 "Diff: 1 file, +11 | -1") — 📝 [docs] Refresh entrypoint repair changelog&nbsp;<sub><em>(1&nbsp;file,&nbsp;+11,&nbsp;-1)</em></sub>
+  - Include the direct runCli regression test in the formatter-stable unreleased history.
+
 - [`6c4ec96`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/6c4ec9641c3542bad3b37cd0d12a3fdf48fe35e7 "Diff: 1 file, +19 | -1") — 📝 [docs] Document packaged entrypoint repair&nbsp;<sub><em>(1&nbsp;file,&nbsp;+19,&nbsp;-1)</em></sub>
   - Regenerate the unreleased changelog from v2.0.0 through the explicit-entrypoint fix and preserve the published v2.0.0 history.
+
+### 🎨 Styling
+
+- [`8fb4f6b`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/8fb4f6b441a65f808ca7813dc061f532716035fc "Diff: 1 file, +5 | -1") — 🎨 [style] Format executable wrapper test&nbsp;<sub><em>(1&nbsp;file,&nbsp;+5,&nbsp;-1)</em></sub>
+  - Apply the repository Prettier output to the new process-state regression case so Linux CI matches the local release gate.
 
 ### 🧪 Testing
 
 - [`5d07642`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/5d076425500d0fbbdc673884df837d9993d8daf8 "Diff: 1 file, +21 | -1") — ✅ [test] Cover executable CLI wrapper&nbsp;<sub><em>(1&nbsp;file,&nbsp;+21,&nbsp;-1)</em></sub>
   - Invoke runCli with controlled process arguments, assert help output and exit status, and restore argv and exit state after the regression check.
+
+### 👷 CI/CD
+
+- [`dffd5d0`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/dffd5d0a2a6ee55d2cf4a1ddf038ae3a0db67a4c "Diff: 1 file, +7 | -0") — 👷 [ci] Make package metadata lint deterministic&nbsp;<sub><em>(1&nbsp;file,&nbsp;+7,&nbsp;-0)</em></sub>
+  - Stop the general JSON-schema rule from fetching SchemaStore for package.json and keep validation on the dedicated npm-package-json-lint gate, avoiding remote reference failures.
 
 ## ✨ What's Changed in v2.0.0
 
