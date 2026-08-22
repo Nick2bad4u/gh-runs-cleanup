@@ -227,7 +227,11 @@ describe("main validation", () => {
         const logSpy = vi.spyOn(console, "log").mockReturnValue(undefined);
 
         try {
-            process.argv = [process.execPath, "gh-runs-cleanup", "--help"];
+            process.argv = [
+                process.execPath,
+                "gh-runs-cleanup",
+                "--help",
+            ];
             runCli();
 
             expect(process.exitCode).toBe(0);
