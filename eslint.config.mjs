@@ -21,6 +21,13 @@ const config = [
         },
     },
     {
+        files: ["package.json"],
+        name: "Validate package metadata without remote SchemaStore resolution",
+        rules: {
+            "json-schema-validator-2/no-invalid": "off",
+        },
+    },
+    {
         files: ["**/*.ts"],
         name: "Require native Node TypeScript import extensions",
         rules: {
