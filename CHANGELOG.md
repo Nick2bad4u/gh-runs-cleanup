@@ -5,7 +5,17 @@
 
 ## ✨ What's Changed
 
-- <b>Commit Range: ➡️</b> [`v1.0.1...6cc9eba`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v1.0.1...6cc9eba62744f714d0ae768eb79f12fc27093293 "View full commit range on GitHub")
+- <b>Commit Range: ➡️</b> [`v2.0.0...321f6f6`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v2.0.0...321f6f658df11e99f7f894f2dff4c567e812bfe0 "View full commit range on GitHub")
+
+### 🛠️ Bug Fixes
+
+- [`321f6f6`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/321f6f658df11e99f7f894f2dff4c567e812bfe0 "Diff: 3 files, +20 | -20") — 🐛 [fix] Run packaged extension through explicit entrypoint&nbsp;<sub><em>(3&nbsp;files,&nbsp;+20,&nbsp;-20)</em></sub>
+  - Remove import-time execution from the CLI module and make both source and SEA wrappers call runCli explicitly.
+  - Regression-test native assets with GitHub CLI's alternate argv0 semantics so an extension cannot silently exit again.
+
+## ✨ What's Changed in v2.0.0
+
+- <b>Commit Range: ➡️</b> [`v1.0.1...v2.0.0`](https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v1.0.1...v2.0.0 "View full commit range on GitHub")
 
 ### 🛠️ Bug Fixes
 
@@ -34,6 +44,8 @@
   - 🔨 [build] Normalize Dependabot-style bracket prefixes so generated entries remain valid Markdown and link checks do not interpret dependency scopes as local paths.
 
 ### 🧹 Chores
+
+- [`da0e960`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/da0e960b98950b316476603507e1d244b15a6cc5 "Diff: 2 files, +3 | -3") — Release v2.0.0&nbsp;<sub><em>(2&nbsp;files,&nbsp;+3,&nbsp;-3)</em></sub>
 
 - [`0cd2b01`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/0cd2b019de2a10489fbaa7b698ceb60c12f43a83 "Diff: 1 file, +13 | -13") — _(tooling)_ Run package CLIs through npx&nbsp;<sub><em>(1&nbsp;file,&nbsp;+13,&nbsp;-13)</em></sub>
   - Apply the local package-script migration so mapped package CLIs resolve through npx, while standardizing Actionlint configuration and removing redundant wrappers where applicable.
@@ -442,6 +454,9 @@ updated-dependencies:
 
 ### 🛡️ Security
 
+- [`e6e518c`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/e6e518cc51ab631818f8d43c54114644bec11095 "Diff: 1 file, +33 | -5") — 📝 [docs] Refresh changelog for Sonar fixes&nbsp;<sub><em>(1&nbsp;file,&nbsp;+33,&nbsp;-5)</em></sub>
+  - Regenerate the unreleased changelog through the formatter-stable pipeline so it includes the security, lint, and generation fixes with valid remote commit links.
+
 - [`ae07a6c`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/ae07a6c8d837ef58df4b824d578f1fe747068a01 "Diff: 15 files, +530 | -180") — 🔒️ [fix] Resolve Sonar findings and harden script linting&nbsp;<sub><em>(15&nbsp;files,&nbsp;+530,&nbsp;-180)</em></sub>
   - Resolve GitHub CLI through trusted absolute paths, with an explicit absolute GH_PATH override for nonstandard installations.
   - Replace the changelog regex with a linear tested normalizer, simplify help and argument parsing, and use Sonar-compatible numeric constants.
@@ -651,6 +666,9 @@ updated-dependencies:
 
 - [`6d7405e`](https://github.com/Nick2bad4u/gh-runs-cleanup/commit/6d7405ef3a418d1d61f6d4e20ad603ea3dc98f5e "Diff: 2 files, +109 | -109") — Merge PR #6&nbsp;<sub><em>(2&nbsp;files,&nbsp;+109,&nbsp;-109)</em></sub>
   - [dependency] Update esbuild 0.28.1 in the npm_and_yarn group across 1 directory
+
+> [!NOTE]
+> **Release comparison**: https://github.com/Nick2bad4u/gh-runs-cleanup/compare/v1.0.1...v2.0.0
 
 ## ✨ What's Changed in v1.0.1
 
