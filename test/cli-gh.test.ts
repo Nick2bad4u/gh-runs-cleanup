@@ -7,10 +7,20 @@ import {
     listReposForOwner,
     listRuns,
     resolveAuthenticatedLogin,
+    resolveGhExecutablePath,
     resolveRepo,
     runGh,
 } from "../src/cli-gh.ts";
 
+const FIRST_TRUSTED_GH_PATH: Readonly<Record<string, string>> = {
+    darwin: "/opt/homebrew/bin/gh",
+    freebsd: "/usr/local/bin/gh",
+    linux: "/usr/bin/gh",
+    openbsd: "/usr/local/bin/gh",
+    win32: String.raw`C:\Program Files\GitHub CLI\gh.exe`,
+};
+
+const existsSyncMock = vi.hoisted(() => vi.fn<(path: string) => boolean>());
 const spawnSyncMock = vi.hoisted(() =>
     vi.fn<
         (
@@ -26,6 +36,7 @@ const spawnSyncMock = vi.hoisted(() =>
 );
 
 vi.mock("node:child_process", () => ({ spawnSync: spawnSyncMock }));
+vi.mock("node:fs", () => ({ existsSync: existsSyncMock }));
 
 function respond(response: Partial<GhResponse> = {}): void {
     spawnSyncMock.mockReturnValueOnce({
@@ -36,6 +47,8 @@ function respond(response: Partial<GhResponse> = {}): void {
 }
 
 beforeEach(() => {
+    existsSyncMock.mockReset();
+    existsSyncMock.mockReturnValue(true);
     spawnSyncMock.mockReset();
 });
 
@@ -50,11 +63,16 @@ describe(runGh, () => {
         respond({ stdout: "ok" });
 
         const result = runGh(["auth", "status"]);
+        const executablePath = FIRST_TRUSTED_GH_PATH[process.platform];
 
-        expect(spawnSyncMock).toHaveBeenCalledWith("gh", ["auth", "status"], {
-            encoding: "utf8",
-            stdio: "pipe",
-        });
+        expect(spawnSyncMock).toHaveBeenCalledWith(
+            executablePath,
+            ["auth", "status"],
+            {
+                encoding: "utf8",
+                stdio: "pipe",
+            }
+        );
         expect(result.status).toBe(0);
         expect(result.stdout).toBe("ok");
         expect(result.stderr).toBe("");
@@ -70,6 +88,58 @@ describe(runGh, () => {
         });
 
         expect(runGh([])).toStrictEqual({ status: 1, stderr: "", stdout: "" });
+    });
+
+    it("returns a useful error when gh has no trusted executable path", () => {
+        expect.assertions(2);
+
+        existsSyncMock.mockReturnValue(false);
+
+        expect(runGh([])).toStrictEqual({
+            status: 1,
+            stderr: "Unable to locate the GitHub CLI in a trusted system location. Set GH_PATH to its absolute executable path.",
+            stdout: "",
+        });
+        expect(spawnSyncMock).not.toHaveBeenCalled();
+    });
+});
+
+describe(resolveGhExecutablePath, () => {
+    it("prefers an existing absolute GH_PATH override", () => {
+        expect.assertions(2);
+
+        const doesFileExist = vi.fn<(path: string) => boolean>(
+            (path) => path === "/custom/bin/gh"
+        );
+
+        expect(
+            resolveGhExecutablePath("linux", "/custom/bin/gh", doesFileExist)
+        ).toBe("/custom/bin/gh");
+        expect(doesFileExist).toHaveBeenCalledExactlyOnceWith("/custom/bin/gh");
+    });
+
+    it("rejects relative overrides and selects a fixed system path", () => {
+        expect.assertions(2);
+
+        const doesFileExist = vi.fn<(path: string) => boolean>(
+            (path) => path === "/usr/local/bin/gh"
+        );
+
+        expect(
+            resolveGhExecutablePath("linux", "relative/gh", doesFileExist)
+        ).toBe("/usr/local/bin/gh");
+        expect(doesFileExist.mock.calls).toStrictEqual([
+            ["/usr/bin/gh"],
+            ["/usr/local/bin/gh"],
+        ]);
+    });
+
+    it("returns undefined when the platform has no trusted installation", () => {
+        expect.assertions(1);
+
+        expect(
+            resolveGhExecutablePath("aix", undefined, () => false)
+        ).toBeUndefined();
     });
 });
 

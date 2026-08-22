@@ -71,6 +71,7 @@
         "node_modules/**"
     ],
     "include": [
+        "scripts/**/*.mts",
         "src/**/*.ts",
         "test/**/*.ts",
         "vitest.config.ts"

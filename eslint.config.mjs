@@ -3,6 +3,11 @@ import { createConfig } from "eslint-config-nick2bad4u";
 /** @type {import("eslint").Linter.Config[]} */
 const config = [
     ...createConfig({
+        allowDefaultProjectFilePatterns: [
+            "*.{js,mjs,cjs}",
+            ".*.{js,mjs,cjs}",
+            "scripts/*.mjs",
+        ],
         plugins: {
             "docusaurus-2": false,
             typefest: false,
@@ -46,18 +51,19 @@ const config = [
     },
     {
         files: ["src/cli-output.ts"],
-        name: "Keep ISO timestamp parsing compatible with supported Node LTS releases",
+        name: "Keep timestamp parsing and numeric constants compatible with Sonar",
         rules: {
             "canonical/no-use-extend-native": "off",
+            "unicorn/prefer-global-number-constants": "off",
             "unicorn/prefer-temporal": "off",
         },
     },
     {
         files: ["src/cli-gh.ts"],
-        name: "Allow the synchronous GitHub CLI boundary",
+        name: "Allow the synchronous GitHub CLI process boundary",
         rules: {
+            "n/no-process-env": "off",
             "n/no-sync": "off",
-            "sonarjs/no-os-command-from-path": "off",
         },
     },
     {
@@ -65,6 +71,17 @@ const config = [
         name: "Allow the executable module to export its testable entry point",
         rules: {
             "unicorn/no-exports-in-scripts": "off",
+        },
+    },
+    {
+        files: ["scripts/**/*.{js,mjs,ts,mts}"],
+        name: "Allow controlled repository maintenance script boundaries",
+        rules: {
+            "n/no-process-env": "off",
+            "n/no-sync": "off",
+            "no-console": "off",
+            "security/detect-non-literal-fs-filename": "off",
+            "unicorn/prefer-error-is-error": "off",
         },
     },
     {

@@ -20,6 +20,7 @@ Project site: <https://nick2bad4u.github.io/gh-runs-cleanup/>
 - Node.js `^22.18.0 || ^24.0.0 || >=26.0.0`
 
 Extension installs run directly from the repository source; no local build step is required for end users.
+For a nonstandard `gh` installation, set `GH_PATH` to the absolute executable path; relative paths and implicit `PATH` lookup are rejected.
 
 ## Usage
 
